@@ -1,0 +1,36 @@
+-- Enable UUID extension
+create extension if not exists "uuid-ossp";
+
+-- 1. Create injuries table
+create table public.injuries (
+  id uuid default uuid_generate_v4() primary key,
+  type text not null check (type in ('injury', 'illness')),
+  body_part text not null,
+  cause text,
+  status text not null default 'healing' check (status in ('healing', 'worsening', 'stagnant', 'healed')),
+  archived boolean default false,
+  start_date timestamp with time zone default timezone('utc'::text, now()) not null,
+  last_updated timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 2. Create logs table (linked to injuries)
+create table public.logs (
+  id uuid default uuid_generate_v4() primary key,
+  injury_id uuid references public.injuries(id) on delete cascade not null,
+  date timestamp with time zone default timezone('utc'::text, now()) not null,
+  image_url text, -- Can be UploadThing URL or Base64 (legacy)
+  pain_level integer not null,
+  notes text,
+  temperature numeric,
+  symptoms text[], -- Array of strings
+  treatments jsonb, -- Store complex treatment objects as JSON
+  activity_level text check (activity_level in ('low', 'medium', 'high'))
+);
+
+-- 3. Row Level Security (RLS) - Optional for prototype (disabled for now to avoid auth complexity)
+alter table public.injuries enable row level security;
+alter table public.logs enable row level security;
+
+-- Allow public access for prototype (WARNING: Not for prod)
+create policy "Public Access Injuries" on public.injuries for all using (true);
+create policy "Public Access Logs" on public.logs for all using (true);

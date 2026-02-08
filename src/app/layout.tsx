@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 };
 
 import { InjuryProvider } from "@/context/injury-context";
+import { SupplyProvider } from "@/context/supply-context"; // Added SupplyProvider import
 
 export default function RootLayout({
   children,
@@ -23,11 +24,13 @@ export default function RootLayout({
     <html lang="en">
       <body className={cn(inter.variable, "font-sans antialiased bg-secondary/30 min-h-screen pb-24")}>
         <InjuryProvider>
-          <Header />
-          <main className="max-w-md mx-auto px-4 py-6 min-h-[calc(100vh-8rem)]">
-            {children}
-          </main>
-          <BottomNav />
+          <SupplyProvider> {/* Wrapped content in SupplyProvider */}
+            <Header />
+            <main className="max-w-md mx-auto px-4 py-6 min-h-[calc(100vh-8rem)]">
+              {children}
+            </main>
+            <BottomNav />
+          </SupplyProvider>
         </InjuryProvider>
       </body>
     </html>

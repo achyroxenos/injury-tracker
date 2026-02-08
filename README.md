@@ -1,36 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏥 Injury Tracker
 
-## Getting Started
+A production-ready Next.js application for tracking and managing injuries with AI-powered analysis, cloud storage, and database persistence.
 
-First, run the development server:
+## ✨ Features
+
+- **AI-Powered Analysis**: Gemini AI provides intelligent injury assessment and healing insights
+- **Cloud Image Storage**: UploadThing integration for unlimited photo storage
+- **Database Persistence**: Supabase backend for cross-device synchronization
+- **Smart Notifications**: Browser notifications for daily logging reminders
+- **3D Body Map**: Interactive body visualization for injury location tracking
+- **Medical Reports**: Export detailed medical reports for healthcare providers
+- **Supply Management**: Track medical supplies and first aid inventory
+- **Healing Timeline**: Visual progress tracking and comparison views
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+ installed
+- npm, yarn, pnpm, or bun package manager
+
+### Installation
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Set up environment variables:
+   ```bash
+   cp .env.local.example .env.local
+   ```
+
+4. Configure your API keys in `.env.local`:
+   - **Gemini API**: Get a free key at [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+   - **UploadThing**: Create account at [https://uploadthing.com](https://uploadthing.com)
+   - **Supabase**: Create project at [https://supabase.com](https://supabase.com)
+
+5. Set up Supabase database:
+   - Run the SQL from `supabase_setup.sql` in your Supabase SQL Editor
+
+6. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+7. Open [http://localhost:3000](http://localhost:3000)
+
+## 🔐 Environment Variables
+
+Required environment variables (see `.env.local.example`):
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+GEMINI_API_KEY=your_gemini_api_key_here
+UPLOADTHING_SECRET=your_uploadthing_secret_here
+UPLOADTHING_APP_ID=your_uploadthing_app_id_here
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url_here
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 📦 Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Styling**: CSS Modules with CSS Variables
+- **AI**: Google Gemini API
+- **Storage**: UploadThing
+- **Database**: Supabase (PostgreSQL)
+- **Deployment**: Vercel-ready
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🏗️ Project Structure
 
-## Learn More
+```
+src/
+├── app/                    # Next.js app router pages
+├── components/             # React components
+│   ├── chat/              # AI chat interface
+│   ├── dashboard/         # Dashboard widgets
+│   ├── gallery/           # Image gallery
+│   ├── injury/            # Injury logging components
+│   ├── layout/            # Layout components
+│   ├── notifications/     # Notification system
+│   ├── report/            # Medical reports
+│   ├── supplies/          # Supply management
+│   └── tools/             # Utility tools
+├── context/               # React context providers
+└── lib/                   # Utility libraries
+```
 
-To learn more about Next.js, take a look at the following resources:
+## 🚢 Deployment
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Deploy to Vercel
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Push your code to GitHub
+2. Import project in [Vercel](https://vercel.com)
+3. Add environment variables in Vercel dashboard
+4. Deploy!
 
-## Deploy on Vercel
+The app will automatically build and deploy on every push to main.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📝 License
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is open source and available under the MIT License.
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+---
+
+Built with ❤️ using Next.js and Google Gemini AI
