@@ -20,7 +20,7 @@ export function QuickLogWidget({ injury }: { injury: Injury }) {
         // Simulate a slight network delay for UI feedback
         await new Promise(r => setTimeout(r, 600));
 
-        await addLogToInjury(injury.id, {
+        const didSave = await addLogToInjury(injury.id, {
             painLevel,
             notes: "Quick Log completed.",
             // Carry over previous data if it exists
@@ -29,6 +29,10 @@ export function QuickLogWidget({ injury }: { injury: Injury }) {
             activityLevel: latestLog?.activityLevel,
             imageUrl: latestLog?.imageUrl // Optional: carry over last photo or leave blank. Let's leave blank for new logs unless specified.
         });
+        if (!didSave) {
+            setIsSubmitting(false);
+            return;
+        }
 
         setIsSubmitting(false);
         setIsSuccess(true);

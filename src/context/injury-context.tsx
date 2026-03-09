@@ -38,8 +38,11 @@ export type Injury = {
 
 type InjuryContextType = {
     injuries: Injury[];
-    addInjury: (data: Omit<Injury, "id" | "status" | "startDate" | "logs">, initialLog: Omit<InjuryLog, "id" | "date" | "injuryId">) => void;
-    addLogToInjury: (injuryId: string, log: Omit<InjuryLog, "id" | "date" | "injuryId">) => void;
+    addInjury: (
+        data: Omit<Injury, "id" | "status" | "startDate" | "logs">,
+        initialLog: Omit<InjuryLog, "id" | "date" | "injuryId">
+    ) => Promise<boolean>;
+    addLogToInjury: (injuryId: string, log: Omit<InjuryLog, "id" | "date" | "injuryId">) => Promise<boolean>;
     getInjury: (id: string) => Injury | undefined;
     getStreak: () => number;
 };
@@ -54,6 +57,29 @@ type LogFingerprint = {
     imageUrl?: string;
 };
 
+type DbInjuryRow = {
+    id: string;
+    type: Injury["type"];
+    body_part: string;
+    cause: string;
+    status: Injury["status"];
+    archived: boolean | null;
+    start_date: string;
+};
+
+type DbLogRow = {
+    id: string;
+    injury_id: string;
+    date: string;
+    image_url: string | null;
+    pain_level: number;
+    temperature: number | null;
+    symptoms: string[] | null;
+    notes: string | null;
+    treatments: Treatment[] | null;
+    activity_level: InjuryLog["activityLevel"] | null;
+};
+
 function makeLogFingerprint(log: LogFingerprint): string {
     return [
         log.date,
@@ -62,6 +88,34 @@ function makeLogFingerprint(log: LogFingerprint): string {
         log.temperature ?? "",
         log.imageUrl ?? "",
     ].join("|");
+}
+
+function mapDbLog(log: DbLogRow): InjuryLog {
+    return {
+        id: log.id,
+        injuryId: log.injury_id,
+        date: log.date,
+        imageUrl: log.image_url ?? undefined,
+        painLevel: log.pain_level,
+        temperature: log.temperature ?? undefined,
+        symptoms: log.symptoms ?? undefined,
+        notes: log.notes ?? "",
+        treatments: log.treatments ?? undefined,
+        activityLevel: log.activity_level ?? undefined,
+    };
+}
+
+function mapDbInjury(injury: DbInjuryRow, logs: InjuryLog[]): Injury {
+    return {
+        id: injury.id,
+        type: injury.type,
+        bodyPart: injury.body_part,
+        cause: injury.cause,
+        status: injury.status,
+        archived: injury.archived ?? false,
+        startDate: injury.start_date,
+        logs,
+    };
 }
 
 export function InjuryProvider({ children }: { children: React.ReactNode }) {
@@ -226,11 +280,13 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             .select('*')
             .order('start_date', { ascending: false });
 
-        if (injError || !injuriesData) {
-            // If table doesn't exist or other error, mostly expected on first run if not set up
-            if (injError.code !== 'PGRST116') { // Ignore result size 0 or similar simple errors? No, log real errors.
-                console.error("Error fetching injuries:", injError);
-            }
+        if (injError) {
+            console.error("Error fetching injuries:", injError);
+            return;
+        }
+
+        if (!injuriesData) {
+            setInjuries([]);
             return;
         }
 
@@ -252,30 +308,17 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Map DB snake_case to app camelCase
-        const mappedInjuries: Injury[] = injuriesData.map(i => ({
-            id: i.id,
-            type: i.type,
-            bodyPart: i.body_part,
-            cause: i.cause,
-            status: i.status,
-            archived: i.archived,
-            startDate: i.start_date,
-            logs: logsData
-                ?.filter(l => l.injury_id === i.id)
-                .map(l => ({
-                    id: l.id,
-                    injuryId: l.injury_id,
-                    date: l.date,
-                    imageUrl: l.image_url,
-                    painLevel: l.pain_level,
-                    temperature: l.temperature,
-                    symptoms: l.symptoms,
-                    notes: l.notes,
-                    treatments: l.treatments,
-                    activityLevel: l.activity_level
-                })) || []
-        }));
+        const logsByInjuryId = new Map<string, InjuryLog[]>();
+        for (const rawLog of logsData ?? []) {
+            const log = mapDbLog(rawLog as DbLogRow);
+            const existing = logsByInjuryId.get(log.injuryId) ?? [];
+            existing.push(log);
+            logsByInjuryId.set(log.injuryId, existing);
+        }
+
+        const mappedInjuries: Injury[] = injuriesData.map((rawInjury) =>
+            mapDbInjury(rawInjury as DbInjuryRow, logsByInjuryId.get(rawInjury.id) ?? [])
+        );
 
         setInjuries(mappedInjuries);
     }
@@ -283,14 +326,15 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
     const addInjury = async (
         data: Omit<Injury, "id" | "status" | "startDate" | "logs">,
         initialLog: Omit<InjuryLog, "id" | "date" | "injuryId">
-    ) => {
+    ): Promise<boolean> => {
         // Fallback to localStorage
         if (!isSupabaseConfigured) {
+            const nowIso = new Date().toISOString();
             const newInjury: Injury = {
                 ...data,
                 id: crypto.randomUUID(),
                 status: "healing",
-                startDate: new Date().toISOString(),
+                startDate: nowIso,
                 logs: []
             };
 
@@ -298,21 +342,23 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                 ...initialLog,
                 id: crypto.randomUUID(),
                 injuryId: newInjury.id,
-                date: new Date().toISOString(),
+                date: nowIso,
             };
 
             newInjury.logs.push(initialLogEntry);
             setInjuries((prev) => [newInjury, ...prev]);
-            return;
+            return true;
         }
 
         if (!session?.user?.id) {
             console.error("Cannot save injury without an authenticated session.");
-            return;
+            return false;
         }
 
+        const nowIso = new Date().toISOString();
+
         // Insert Injury to Supabase
-        const { data: newInjury, error: injError } = await supabase
+        const { data: insertedInjury, error: injError } = await supabase
             .from('injuries')
             .insert({
                 user_id: session.user.id,
@@ -320,22 +366,22 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                 body_part: data.bodyPart,
                 cause: data.cause,
                 status: 'healing',
-                start_date: new Date().toISOString()
+                start_date: nowIso
             })
-            .select()
+            .select('*')
             .single();
 
-        if (injError || !newInjury) {
-            alert("Failed to save injury: " + injError?.message);
-            return;
+        if (injError || !insertedInjury) {
+            console.error("Failed to save injury:", injError);
+            return false;
         }
 
         // Insert Log
-        const { error: logError } = await supabase
+        const { data: insertedLog, error: logError } = await supabase
             .from('logs')
             .insert({
-                injury_id: newInjury.id,
-                date: new Date().toISOString(),
+                injury_id: insertedInjury.id,
+                date: nowIso,
                 image_url: initialLog.imageUrl,
                 pain_level: initialLog.painLevel,
                 notes: initialLog.notes,
@@ -343,17 +389,23 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                 symptoms: initialLog.symptoms,
                 treatments: initialLog.treatments,
                 activity_level: initialLog.activityLevel
-            });
+            })
+            .select('*')
+            .single();
 
-        if (logError) {
-            alert("Failed to save log: " + logError.message);
-            return;
+        if (logError || !insertedLog) {
+            console.error("Failed to save log:", logError);
+            // Best-effort rollback so we do not leave orphan injuries without their initial log.
+            await supabase.from("injuries").delete().eq("id", insertedInjury.id);
+            return false;
         }
 
-        fetchInjuries(session.user.id); // Refresh local state
+        const mappedInjury = mapDbInjury(insertedInjury as DbInjuryRow, [mapDbLog(insertedLog as DbLogRow)]);
+        setInjuries((prev) => [mappedInjury, ...prev]);
+        return true;
     };
 
-    const addLogToInjury = async (injuryId: string, logData: Omit<InjuryLog, "id" | "date" | "injuryId">) => {
+    const addLogToInjury = async (injuryId: string, logData: Omit<InjuryLog, "id" | "date" | "injuryId">): Promise<boolean> => {
         // Fallback to localStorage
         if (!isSupabaseConfigured) {
             const newLog: InjuryLog = {
@@ -368,20 +420,22 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                     inj.id === injuryId ? { ...inj, logs: [...inj.logs, newLog] } : inj
                 )
             );
-            return;
+            return true;
         }
 
         if (!session?.user?.id) {
             console.error("Cannot add log without an authenticated session.");
-            return;
+            return false;
         }
 
+        const nowIso = new Date().toISOString();
+
         // Insert to Supabase
-        const { error } = await supabase
+        const { data: insertedLog, error } = await supabase
             .from('logs')
             .insert({
                 injury_id: injuryId,
-                date: new Date().toISOString(),
+                date: nowIso,
                 image_url: logData.imageUrl,
                 pain_level: logData.painLevel,
                 notes: logData.notes,
@@ -389,14 +443,22 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                 symptoms: logData.symptoms,
                 treatments: logData.treatments,
                 activity_level: logData.activityLevel
-            });
+            })
+            .select('*')
+            .single();
 
-        if (error) {
-            alert("Failed to add log: " + error.message);
-            return;
+        if (error || !insertedLog) {
+            console.error("Failed to add log:", error);
+            return false;
         }
 
-        fetchInjuries(session.user.id); // Refresh
+        const mappedLog = mapDbLog(insertedLog as DbLogRow);
+        setInjuries((prev) =>
+            prev.map((inj) =>
+                inj.id === injuryId ? { ...inj, logs: [...inj.logs, mappedLog] } : inj
+            )
+        );
+        return true;
     };
 
     useEffect(() => {
@@ -431,9 +493,8 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (!isSupabaseConfigured && injuries.length > 0) {
-            localStorage.setItem("injury-data", JSON.stringify(injuries));
-        }
+        if (isSupabaseConfigured) return;
+        localStorage.setItem("injury-data", JSON.stringify(injuries));
     }, [injuries]);
 
     const getInjury = (id: string) => injuries.find((i) => i.id === id);
@@ -445,8 +506,6 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             inj.logs.forEach(log => {
                 allDates.add(new Date(log.date).toDateString());
             });
-            // Also count the start date
-            allDates.add(new Date(inj.startDate).toDateString());
         });
 
         // Sort dates descending

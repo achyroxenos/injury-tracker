@@ -20,7 +20,7 @@ create table public.logs (
   injury_id uuid references public.injuries(id) on delete cascade not null,
   date timestamp with time zone default timezone('utc'::text, now()) not null,
   image_url text, -- Can be UploadThing URL or Base64 (legacy)
-  pain_level integer not null,
+  pain_level integer not null check (pain_level between 0 and 10),
   notes text,
   temperature numeric,
   symptoms text[], -- Array of strings
@@ -28,7 +28,26 @@ create table public.logs (
   activity_level text check (activity_level in ('low', 'medium', 'high'))
 );
 
--- 3. Row Level Security (RLS) - Secure Mode
+-- 3. Performance indexes
+create index if not exists injuries_user_id_idx on public.injuries(user_id);
+create index if not exists logs_injury_id_idx on public.logs(injury_id);
+
+-- 4. Keep injuries.last_updated current on every update
+create or replace function public.set_last_updated()
+returns trigger as $$
+begin
+  new.last_updated = timezone('utc'::text, now());
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists set_injuries_last_updated on public.injuries;
+create trigger set_injuries_last_updated
+before update on public.injuries
+for each row
+execute function public.set_last_updated();
+
+-- 5. Row Level Security (RLS) - Secure Mode
 alter table public.injuries enable row level security;
 alter table public.logs enable row level security;
 

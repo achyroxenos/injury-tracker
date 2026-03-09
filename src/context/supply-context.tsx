@@ -39,9 +39,7 @@ export function SupplyProvider({ children }: { children: React.ReactNode }) {
     });
 
     useEffect(() => {
-        if (supplies.length > 0) {
-            localStorage.setItem("supply-data", JSON.stringify(supplies));
-        }
+        localStorage.setItem("supply-data", JSON.stringify(supplies));
     }, [supplies]);
 
     const addSupply = (data: Omit<Supply, "id">) => {

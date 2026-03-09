@@ -87,12 +87,12 @@ export function InjuryForm() {
         }));
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (injuryId) {
             // Add log to existing injury
-            addLogToInjury(injuryId, {
+            const didSave = await addLogToInjury(injuryId, {
                 imageUrl: imagePreview || undefined,
                 painLevel: formData.painLevel,
                 notes: formData.details,
@@ -101,10 +101,11 @@ export function InjuryForm() {
                 treatments: formData.treatments,
                 activityLevel: formData.activityLevel,
             });
+            if (!didSave) return;
             router.push(`/chat?context=${injuryId}`);
         } else {
             // Create new
-            addInjury({
+            const didSave = await addInjury({
                 type: logType,
                 bodyPart: logType === "illness" ? "General Illness" : formData.bodyPart,
                 cause: formData.cause,
@@ -117,6 +118,7 @@ export function InjuryForm() {
                 treatments: formData.treatments,
                 activityLevel: formData.activityLevel,
             });
+            if (!didSave) return;
             router.push("/");
         }
     };
