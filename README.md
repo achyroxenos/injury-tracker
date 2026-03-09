@@ -4,14 +4,15 @@ A production-ready Next.js application for tracking and managing injuries with A
 
 ## ✨ Features
 
-- **AI-Powered Analysis**: Gemini AI provides intelligent injury assessment and healing insights
-- **Cloud Image Storage**: UploadThing integration for unlimited photo storage
-- **Database Persistence**: Supabase backend for cross-device synchronization
-- **Smart Notifications**: Browser notifications for daily logging reminders
-- **3D Body Map**: Interactive body visualization for injury location tracking
-- **Medical Reports**: Export detailed medical reports for healthcare providers
-- **Supply Management**: Track medical supplies and first aid inventory
-- **Healing Timeline**: Visual progress tracking and comparison views
+- **AI-Powered Analysis**: Gemini AI provides intelligent injury assessment and healing insights with formatted markdown responses.
+- **Premium UI/UX**: Glassmorphism design, smooth micro-animations, and dynamic navigation styling for a modern application feel.
+- **Cloud Image Storage**: UploadThing integration for unlimited photo storage.
+- **Database Resilience**: Supabase backend with smart offline-caching and auto-sync features for cross-device synchronization.
+- **Smart Notifications**: Browser notifications for daily logging reminders.
+- **3D Interactive Body Map**: A fully interactive 3D body visualization with premium lighting and materials for accurate injury location tracking.
+- **Medical Reports**: Export detailed medical reports for healthcare providers.
+- **Supply Management**: Track medical supplies and first aid inventory.
+- **Healing Timeline**: Visual progress tracking and image comparison views.
 
 ## 🚀 Getting Started
 
@@ -64,10 +65,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key_here
 
 - **Framework**: Next.js 15 (App Router)
 - **Language**: TypeScript
-- **Styling**: CSS Modules with CSS Variables
-- **AI**: Google Gemini API
+- **Styling**: Tailwind CSS v4 + Vanilla CSS Variables (Glassmorphism & Custom Animations)
+- **3D Rendering**: React Three Fiber & Drei
+- **AI**: Google Gemini API (gemini-1.5-flash)
 - **Storage**: UploadThing
-- **Database**: Supabase (PostgreSQL)
+- **Database**: Supabase (PostgreSQL) with Offline Sync
 - **Deployment**: Vercel-ready
 
 ## 🏗️ Project Structure
