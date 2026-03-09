@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect } from "react";
-import { Eraser, Pencil, Ruler } from "lucide-react";
+import { Eraser, Pencil, RotateCcw, Ruler } from "lucide-react";
 
 export function WoundAreaCalculator({
     imageUrl,
@@ -11,144 +11,188 @@ export function WoundAreaCalculator({
     onSave: (areaCm2: number) => void
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const imageCanvasRef = useRef<HTMLCanvasElement | null>(null);
+    const maskCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [mode, setMode] = useState<"draw" | "erase">("draw");
-    const [pixelCount, setPixelCount] = useState(0);
-    const [totalPixels, setTotalPixels] = useState(0);
-    // User must define the width of the image in real world (e.g. 10cm) to get scale
     const [scaleWidthCm, setScaleWidthCm] = useState(10);
+    const [coverage, setCoverage] = useState(0);
+    const [estimatedArea, setEstimatedArea] = useState<number | null>(null);
+
+    const redrawPreview = () => {
+        const canvas = canvasRef.current;
+        const baseCanvas = imageCanvasRef.current;
+        const maskCanvas = maskCanvasRef.current;
+        if (!canvas || !baseCanvas || !maskCanvas) return;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(baseCanvas, 0, 0);
+
+        // Tint only the masked area so users can see what is selected.
+        ctx.save();
+        ctx.fillStyle = "rgba(225, 29, 72, 0.45)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalCompositeOperation = "destination-in";
+        ctx.drawImage(maskCanvas, 0, 0);
+        ctx.restore();
+    };
+
+    const getPaintedPixelCount = () => {
+        const maskCanvas = maskCanvasRef.current;
+        if (!maskCanvas) return 0;
+
+        const maskCtx = maskCanvas.getContext("2d");
+        if (!maskCtx) return 0;
+
+        const imageData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+        let paintedPixels = 0;
+
+        for (let index = 3; index < imageData.length; index += 4) {
+            if (imageData[index] > 0) paintedPixels++;
+        }
+
+        return paintedPixels;
+    };
+
+    const recalculateEstimate = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const totalPixels = canvas.width * canvas.height;
+        if (totalPixels === 0) return;
+
+        const paintedPixels = getPaintedPixelCount();
+        const nextCoverage = paintedPixels / totalPixels;
+        const widthCm = Math.max(0.1, scaleWidthCm);
+        const heightCm = widthCm * (canvas.height / canvas.width);
+        const totalAreaCm2 = widthCm * heightCm;
+        const area = Number((totalAreaCm2 * nextCoverage).toFixed(2));
+
+        setCoverage(nextCoverage);
+        setEstimatedArea(area);
+        onSave(area);
+    };
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
 
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = imageUrl;
         img.onload = () => {
-            canvas.width = 300; // Fixed width for UI consistency
-            canvas.height = (img.height / img.width) * 300;
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            setTotalPixels(canvas.width * canvas.height);
+            const width = 300;
+            const height = Math.round((img.height / img.width) * width);
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const baseCanvas = document.createElement("canvas");
+            baseCanvas.width = width;
+            baseCanvas.height = height;
+            const baseCtx = baseCanvas.getContext("2d");
+            if (!baseCtx) return;
+            baseCtx.drawImage(img, 0, 0, width, height);
+
+            const maskCanvas = document.createElement("canvas");
+            maskCanvas.width = width;
+            maskCanvas.height = height;
+
+            imageCanvasRef.current = baseCanvas;
+            maskCanvasRef.current = maskCanvas;
+            setCoverage(0);
+            setEstimatedArea(null);
+            redrawPreview();
         };
     }, [imageUrl]);
 
-    const draw = (e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDrawing) return;
+    const getPointerPosition = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
+        if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
-        let x, y;
 
-        if ('touches' in e) {
-            x = e.touches[0].clientX - rect.left;
-            y = e.touches[0].clientY - rect.top;
-        } else {
-            x = (e as React.MouseEvent).clientX - rect.left;
-            y = (e as React.MouseEvent).clientY - rect.top;
+        if ("touches" in e) {
+            const touch = e.touches[0] ?? e.changedTouches[0];
+            return {
+                x: touch.clientX - rect.left,
+                y: touch.clientY - rect.top,
+            };
         }
 
-        ctx.globalCompositeOperation = mode === "draw" ? "source-over" : "destination-out";
-
-        // If "draw" mode, we paint a semi-transparent red
-        if (mode === "draw") {
-            ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-            ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
-        } else {
-            ctx.strokeStyle = "rgba(0,0,0,1)"; // Doesn't matter for erase
-        }
-
-        ctx.lineWidth = 15;
-        ctx.lineCap = "round";
-
-        ctx.lineTo(x, y);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-
-        calculateFilledArea();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+        };
     };
 
-    const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        if (!isDrawing) return;
+
+        e.preventDefault();
+        const maskCanvas = maskCanvasRef.current;
+        if (!maskCanvas) return;
+        const maskCtx = maskCanvas.getContext("2d");
+        if (!maskCtx) return;
+
+        const { x, y } = getPointerPosition(e);
+
+        maskCtx.globalCompositeOperation = mode === "draw" ? "source-over" : "destination-out";
+        maskCtx.strokeStyle = "rgba(255,255,255,1)";
+        maskCtx.lineWidth = 16;
+        maskCtx.lineCap = "round";
+        maskCtx.lineJoin = "round";
+        maskCtx.lineTo(x, y);
+        maskCtx.stroke();
+        maskCtx.beginPath();
+        maskCtx.moveTo(x, y);
+
+        redrawPreview();
+    };
+
+    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+        e.preventDefault();
+        const maskCanvas = maskCanvasRef.current;
+        if (!maskCanvas) return;
+        const maskCtx = maskCanvas.getContext("2d");
+        if (!maskCtx) return;
+
+        const { x, y } = getPointerPosition(e);
         setIsDrawing(true);
-        draw(e);
+        maskCtx.globalCompositeOperation = mode === "draw" ? "source-over" : "destination-out";
+        maskCtx.strokeStyle = "rgba(255,255,255,1)";
+        maskCtx.lineWidth = 16;
+        maskCtx.lineCap = "round";
+        maskCtx.lineJoin = "round";
+        maskCtx.beginPath();
+        maskCtx.moveTo(x, y);
+        maskCtx.lineTo(x, y);
+        maskCtx.stroke();
+        redrawPreview();
     };
 
     const stopDrawing = () => {
+        if (!isDrawing) return;
         setIsDrawing(false);
-        const canvas = canvasRef.current;
-        if (canvas) {
-            const ctx = canvas.getContext("2d");
-            ctx?.beginPath(); // Reset path
-        }
+        const maskCanvas = maskCanvasRef.current;
+        if (!maskCanvas) return;
+        const maskCtx = maskCanvas.getContext("2d");
+        maskCtx?.beginPath();
     };
 
-    const calculateFilledArea = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
+    const clearMask = () => {
+        const maskCanvas = maskCanvasRef.current;
+        if (!maskCanvas) return;
 
-        // This is a heavy operation, effectively throttling it to mouse up would be better for prod,
-        // but for prototype immediate feedback is nice.
-        // Simplified: we rely on visual feedback mostly, calculation on "Calculate" button
-    };
+        const maskCtx = maskCanvas.getContext("2d");
+        if (!maskCtx) return;
 
-    const finalizeCalculation = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
-        let count = 0;
-
-        // Check for non-transparent pixels (alphas) or red channel manipulation 
-        // Since we drew semi-transparent red on top of an image, checking exact pixel values is complex because of blending.
-        // A better approach for the prototype: 
-        // PROTOTYPE HACK: We assume the user is "painting" on a separate layer in a real app. 
-        // Here we just count pixels that *changed* significantly towards red, or better yet,
-        // let's just cheat for the prototype and count how much the user "moved" the mouse? No, that's bad.
-
-        // Simpler approach for prototype: Just rely on the user visually marking it, and we simulate the calculation
-        // based on a simple "coverage" percentage if we had a mask layer.
-        // Since we are drawing directly on the image, extracting the mask is hard.
-
-        // REVISE: Let's use two canvases. One for image, one for drawing mask.
-        // Actually, for this specific tool call, getting pixel data is fine if we check for the specific color we drew,
-        // but blending makes it hard.
-
-        // Let's assume the component tracks 'pixels painted' via the events? No.
-
-        // Let's return a simulated area for now based on a random factor of "scaleWidthCm", 
-        // to show the concept works end-to-end, as precise IPFS/Canvas processing is out of scope for a quick prototype code gen.
-        // Wait, I can do better. Count pixels that are "reddish" if I drew red?
-        // Or just allow user to input "Length x Width" with the ruler tool.
-
-        // Let's implement the "Ruler" mode. User sets two points.
-        // Actually, simplest valuable feature:
-        // User inputs "Reference Width" of the view (e.g. skin patch is 10cm wide).
-        // User paints the wound.
-        // We calculate (Painted Pixels / Total Pixels) * (Total Area).
-
-        // Only way to distinguish painted pixels from image pixels cheaply:
-        // Use a second canvas for the mask that is hidden!
-        // Yes, let's do that in version 2.  For now, I will skip the complex canvas logic 
-        // and allow the user to just drag a slider "Estimated Coverage %". 
-        // It's robust and simpler.
-
-        // OR better: The tool description says "Wound Surface Area Calculator".
-        // Let's stick to a manual "Ruler" input for now?
-        // "Measure Length" and "Measure Width".
-
-        const area = (scaleWidthCm * scaleWidthCm) * 0.25; // Dummy calculation
-        onSave(parseFloat(area.toFixed(2)));
+        maskCtx.clearRect(0, 0, maskCanvas.width, maskCanvas.height);
+        setCoverage(0);
+        setEstimatedArea(null);
+        redrawPreview();
     };
 
     return (
@@ -161,6 +205,7 @@ export function WoundAreaCalculator({
                         onMouseDown={startDrawing}
                         onMouseMove={draw}
                         onMouseUp={stopDrawing}
+                        onMouseLeave={stopDrawing}
                         onTouchStart={startDrawing}
                         onTouchMove={draw}
                         onTouchEnd={stopDrawing}
@@ -184,6 +229,14 @@ export function WoundAreaCalculator({
                 >
                     <Eraser className="w-5 h-5" />
                 </button>
+                <button
+                    type="button"
+                    onClick={clearMask}
+                    className="p-2 rounded-full bg-card border"
+                    aria-label="Clear marked area"
+                >
+                    <RotateCcw className="w-5 h-5" />
+                </button>
             </div>
 
             <div className="space-y-2">
@@ -191,15 +244,22 @@ export function WoundAreaCalculator({
                 <input
                     type="number"
                     value={scaleWidthCm}
-                    onChange={(e) => setScaleWidthCm(parseInt(e.target.value))}
+                    min={0.1}
+                    step={0.1}
+                    onChange={(e) => setScaleWidthCm(Number.parseFloat(e.target.value) || 0)}
                     className="w-full p-2 rounded-lg bg-card border"
                 />
-                <p className="text-[10px] text-muted-foreground">Width of the visible area in the photo.</p>
+                <p className="text-[10px] text-muted-foreground">Approximate width of the visible area in the photo.</p>
+            </div>
+
+            <div className="rounded-lg border bg-card p-3 text-xs text-muted-foreground">
+                <p>Coverage: {(coverage * 100).toFixed(1)}%</p>
+                <p>Estimated area: {estimatedArea !== null ? `${estimatedArea} cm²` : "Not calculated yet"}</p>
             </div>
 
             <button
                 type="button"
-                onClick={finalizeCalculation}
+                onClick={recalculateEstimate}
                 className="w-full py-3 bg-secondary text-secondary-foreground rounded-xl font-bold flex items-center justify-center gap-2"
             >
                 <Ruler className="w-4 h-4" /> Calculate Area

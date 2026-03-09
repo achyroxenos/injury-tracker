@@ -18,23 +18,25 @@ type SupplyContextType = {
 };
 
 const SupplyContext = createContext<SupplyContextType | undefined>(undefined);
+const DEFAULT_SUPPLIES: Supply[] = [
+    { id: "1", name: "Bandages", quantity: 5, unit: "pcs", lowThreshold: 3 },
+    { id: "2", name: "Ibuprofen", quantity: 12, unit: "pills", lowThreshold: 5 },
+    { id: "3", name: "Antibiotic Cream", quantity: 1, unit: "tube", lowThreshold: 1 },
+];
 
 export function SupplyProvider({ children }: { children: React.ReactNode }) {
-    const [supplies, setSupplies] = useState<Supply[]>([]);
-
-    useEffect(() => {
+    const [supplies, setSupplies] = useState<Supply[]>(() => {
+        if (typeof window === "undefined") return DEFAULT_SUPPLIES;
         const stored = localStorage.getItem("supply-data");
-        if (stored) {
-            setSupplies(JSON.parse(stored));
-        } else {
-            // Defaults
-            setSupplies([
-                { id: "1", name: "Bandages", quantity: 5, unit: "pcs", lowThreshold: 3 },
-                { id: "2", name: "Ibuprofen", quantity: 12, unit: "pills", lowThreshold: 5 },
-                { id: "3", name: "Antibiotic Cream", quantity: 1, unit: "tube", lowThreshold: 1 },
-            ]);
+        if (!stored) return DEFAULT_SUPPLIES;
+
+        try {
+            return JSON.parse(stored) as Supply[];
+        } catch (error) {
+            console.error("Failed to parse supply data from localStorage", error);
+            return DEFAULT_SUPPLIES;
         }
-    }, []);
+    });
 
     useEffect(() => {
         if (supplies.length > 0) {

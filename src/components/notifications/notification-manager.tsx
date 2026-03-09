@@ -1,46 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { Bell, BellOff } from "lucide-react";
+import { useInjury } from "@/context/injury-context";
+import { requestNotificationPermission, checkAndTriggerDailyNudge } from "@/lib/notifications";
 
 export function NotificationManager() {
-    const [permission, setPermission] = useState<NotificationPermission>("default");
-    const [isSupported, setIsSupported] = useState(false);
+    const { injuries } = useInjury();
+    const isSupported = typeof window !== "undefined" && "Notification" in window;
+    const [permission, setPermission] = useState<NotificationPermission>(
+        isSupported ? Notification.permission : "default"
+    );
 
+    // Run the nudge check when the component mounts (app launch)
     useEffect(() => {
-        // Check if notifications are supported
-        if (typeof window !== "undefined" && "Notification" in window) {
-            setIsSupported(true);
-            setPermission(Notification.permission);
-        }
-    }, []);
+        if (permission === 'granted') {
+            const activeInjuries = injuries.filter(i => !i.archived);
 
-    const requestPermission = async () => {
+            // Find the absolute latest log across all active injuries
+            let latestGlobalDate: string | null = null;
+            activeInjuries.forEach(injury => {
+                if (injury.logs.length > 0) {
+                    const lastLog = injury.logs[injury.logs.length - 1];
+                    if (!latestGlobalDate || new Date(lastLog.date) > new Date(latestGlobalDate)) {
+                        latestGlobalDate = lastLog.date;
+                    }
+                } else if (!latestGlobalDate || new Date(injury.startDate) > new Date(latestGlobalDate)) {
+                    // If no logs, fallback to start date
+                    latestGlobalDate = injury.startDate;
+                }
+            });
+
+            checkAndTriggerDailyNudge(latestGlobalDate, activeInjuries.length);
+        }
+    }, [permission, injuries]);
+
+    const handleRequestPermission = async () => {
         if (!isSupported) {
             alert("Notifications are not supported in this browser.");
             return;
         }
 
-        const result = await Notification.requestPermission();
-        setPermission(result);
-
-        if (result === "granted") {
-            // Schedule a test notification
-            scheduleReminder("Daily Check-In", "Don't forget to log your recovery progress today!", 10000); // 10 seconds
-        }
-    };
-
-    const scheduleReminder = (title: string, body: string, delay: number) => {
-        setTimeout(() => {
-            if (Notification.permission === "granted") {
-                new Notification(title, {
-                    body,
-                    icon: "/icon-192.png", // You can add an icon later
-                    badge: "/icon-192.png",
-                    tag: "injury-tracker-reminder"
-                });
-            }
-        }, delay);
+        const granted = await requestNotificationPermission();
+        setPermission(granted ? "granted" : "denied");
     };
 
     if (!isSupported) return null;
@@ -67,7 +69,7 @@ export function NotificationManager() {
 
             {permission !== "granted" && permission !== "denied" && (
                 <button
-                    onClick={requestPermission}
+                    onClick={handleRequestPermission}
                     className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-bold"
                 >
                     Enable

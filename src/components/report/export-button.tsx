@@ -21,7 +21,7 @@ export function ExportReportButton({ injury }: { injury: Injury }) {
             fileName={`injury-report-${injury.bodyPart.toLowerCase().replace(/\s/g, '-')}.pdf`}
             className="bg-card hover:bg-secondary text-foreground p-2 rounded-full border shadow-sm transition-colors flex items-center justify-center"
         >
-            {({ blob, url, loading, error }) =>
+            {({ loading }) =>
                 loading ? (
                     <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
                 ) : (

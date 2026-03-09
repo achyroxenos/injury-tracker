@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { RefreshCw, Play, Pause, Save, RotateCcw } from "lucide-react";
+import { RefreshCw, Play, Pause, Save } from "lucide-react";
 
 export function RangeOfMotion({ onSave }: { onSave: (angle: number) => void }) {
     const [isMeasuring, setIsMeasuring] = useState(false);

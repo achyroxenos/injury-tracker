@@ -1,7 +1,9 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { Session } from "@supabase/supabase-js";
 
 export type InjuryLog = {
     id: string;
@@ -47,45 +49,58 @@ const InjuryContext = createContext<InjuryContextType | undefined>(undefined);
 
 export function InjuryProvider({ children }: { children: React.ReactNode }) {
     const [injuries, setInjuries] = useState<Injury[]>([]);
+    const [session, setSession] = useState<Session | null>(null);
+    const router = useRouter();
+    const pathname = usePathname();
 
-    // Fetch initial data
-    useEffect(() => {
-        fetchInjuries();
-    }, []);
-
-    // Save to localStorage when not using Supabase
-    useEffect(() => {
-        if (injuries.length > 0) {
-            localStorage.setItem("injury-data", JSON.stringify(injuries));
-        }
-    }, [injuries]);
-
-    // Attempt to sync offline data to Supabase when it becomes available
-    useEffect(() => {
-        if (isSupabaseConfigured) {
-            syncOfflineData();
-        }
-    }, []);
-
-    const syncOfflineData = async () => {
+    async function syncOfflineData(userId: string) {
         const saved = localStorage.getItem("injury-data");
         if (!saved) return;
 
         try {
             const localInjuries: Injury[] = JSON.parse(saved);
-            // This is a naive sync for demonstration:
-            // In a production app, we would check which IDs exist remotely and only push new ones.
-            // For now, we rely on the primary key constraint to fail gracefully or use upsert if configured.
-            console.log("Found local data, ready to sync to Supabase:", localInjuries.length, "records.");
-        } catch (e) {
-            console.error("Failed to parse local injury data for sync", e);
-        }
-    };
+            console.log(`Migrating ${localInjuries.length} local records to cloud account...`);
 
-    const fetchInjuries = async () => {
-        // Fallback to localStorage if Supabase is not configured or offline
-        if (!isSupabaseConfigured) {
-            console.warn("Supabase not configured. Using local storage mode.");
+            for (const injury of localInjuries) {
+                const { data: existing } = await supabase.from('injuries').select('id').eq('id', injury.id).single();
+                if (existing) continue;
+
+                await supabase.from('injuries').insert({
+                    id: injury.id,
+                    user_id: userId,
+                    type: injury.type,
+                    body_part: injury.bodyPart,
+                    cause: injury.cause,
+                    status: injury.status,
+                    start_date: injury.startDate
+                });
+
+                for (const log of injury.logs) {
+                    await supabase.from('logs').insert({
+                        id: log.id,
+                        injury_id: injury.id,
+                        date: log.date,
+                        image_url: log.imageUrl,
+                        pain_level: log.painLevel,
+                        notes: log.notes,
+                        temperature: log.temperature,
+                        symptoms: log.symptoms,
+                        treatments: log.treatments,
+                        activity_level: log.activityLevel
+                    });
+                }
+            }
+
+            localStorage.removeItem("injury-data");
+            console.log("Migration complete!");
+        } catch (e) {
+            console.error("Failed to migrate local injury data", e);
+        }
+    }
+
+    async function fetchInjuries(userId?: string) {
+        // Fallback to localStorage if Supabase is not configured or user is not logged in
+        if (!isSupabaseConfigured || !userId) {
             const saved = localStorage.getItem("injury-data");
             if (saved) {
                 try {
@@ -97,7 +112,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        // Fetch injuries from Supabase
+        // Fetch injuries from Supabase (RLS will automatically restrict to the user's data)
         const { data: injuriesData, error: injError } = await supabase
             .from('injuries')
             .select('*')
@@ -155,7 +170,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
         }));
 
         setInjuries(mappedInjuries);
-    };
+    }
 
     const addInjury = async (
         data: Omit<Injury, "id" | "status" | "startDate" | "logs">,
@@ -187,6 +202,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
         const { data: newInjury, error: injError } = await supabase
             .from('injuries')
             .insert({
+                user_id: session?.user?.id,
                 type: data.type,
                 body_part: data.bodyPart,
                 cause: data.cause,
@@ -221,7 +237,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        fetchInjuries(); // Refresh local state
+        fetchInjuries(session?.user?.id); // Refresh local state
     };
 
     const addLogToInjury = async (injuryId: string, logData: Omit<InjuryLog, "id" | "date" | "injuryId">) => {
@@ -262,8 +278,45 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        fetchInjuries(); // Refresh
+        fetchInjuries(session?.user?.id); // Refresh
     };
+
+    useEffect(() => {
+        if (!isSupabaseConfigured) {
+            queueMicrotask(() => {
+                void fetchInjuries();
+            });
+            return;
+        }
+
+        supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+            setSession(initialSession);
+            if (!initialSession && pathname !== '/login') {
+                router.push('/login');
+            } else if (initialSession) {
+                syncOfflineData(initialSession.user.id);
+            }
+            fetchInjuries(initialSession?.user?.id);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+            setSession(currentSession);
+            if (!currentSession && pathname !== '/login') {
+                router.push('/login');
+            } else if (currentSession) {
+                syncOfflineData(currentSession.user.id);
+            }
+            fetchInjuries(currentSession?.user?.id);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [pathname, router]);
+
+    useEffect(() => {
+        if ((!isSupabaseConfigured || !session) && injuries.length > 0) {
+            localStorage.setItem("injury-data", JSON.stringify(injuries));
+        }
+    }, [injuries, session]);
 
     const getInjury = (id: string) => injuries.find((i) => i.id === id);
 
@@ -293,7 +346,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Count backwards
-        let currentCheck = new Date();
+        const currentCheck = new Date();
         // If the latest log was yesterday, start checking from yesterday
         if (sortedDates[0] === yesterday) {
             currentCheck.setDate(currentCheck.getDate() - 1);

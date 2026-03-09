@@ -2,12 +2,11 @@
 
 import React, { useRef, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, useGLTF, Html } from "@react-three/drei";
+import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 
 function BodyModel({ onSelectPart, selectedPart }: { onSelectPart: (part: string) => void, selectedPart?: string }) {
-    // In a real app, we would load a proper .gltf model here.
-    // For this prototype, we'll construct a "body" out of geometric primitives.
+    // Lightweight geometric model used for interactive body-part selection.
 
     return (
         <group position={[0, -1, 0]}>
@@ -73,11 +72,20 @@ function BodyModel({ onSelectPart, selectedPart }: { onSelectPart: (part: string
     );
 }
 
-function BodyPart({ position, args, color, name, onClick, geometry = "sphere" }: any) {
+type BodyPartProps = {
+    position: [number, number, number];
+    args: [number, number, number];
+    color: string;
+    name: string;
+    onClick: () => void;
+    geometry?: "sphere" | "box";
+};
+
+function BodyPart({ position, args, color, name, onClick, geometry = "sphere" }: BodyPartProps) {
     const [hovered, setHover] = useState(false);
     const meshRef = useRef<THREE.Mesh>(null);
 
-    useFrame((state) => {
+    useFrame(() => {
         if (meshRef.current && hovered) {
             meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, position[1] + 0.05, 0.1);
         } else if (meshRef.current) {

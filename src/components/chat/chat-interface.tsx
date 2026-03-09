@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Send, Loader2, Camera, History, ArrowLeft } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import Image from "next/image";
+import { Send, Loader2, Camera, History } from "lucide-react";
 import { useInjury } from "@/context/injury-context";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -16,7 +17,6 @@ type Message = {
 };
 
 export function ChatInterface() {
-    const router = useRouter();
     const searchParams = useSearchParams();
     const contextId = searchParams.get("context");
     const { getInjury } = useInjury();
@@ -56,7 +56,7 @@ export function ChatInterface() {
                 },
             ]);
         }
-    }, [injury]);
+    }, [injury, messages.length]);
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -81,7 +81,7 @@ export function ChatInterface() {
         setIsLoading(true);
 
         try {
-            // Call real AI (or mock if no key)
+            // Analyze against the selected injury context.
             const result = await analyzeInjury(injury, userMsg.content);
 
             setMessages((prev) => [
@@ -92,7 +92,7 @@ export function ChatInterface() {
                     content: result.text,
                 },
             ]);
-        } catch (err) {
+        } catch {
             setMessages((prev) => [
                 ...prev,
                 {
@@ -216,7 +216,13 @@ export function ChatInterface() {
                                 <div className="relative z-10">
                                     <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center border-2 border-background shadow-sm overflow-hidden">
                                         {log.imageUrl ? (
-                                            <img src={log.imageUrl} className="w-full h-full object-cover" />
+                                            <Image
+                                                src={log.imageUrl}
+                                                alt={`Log photo from ${new Date(log.date).toLocaleDateString()}`}
+                                                fill
+                                                sizes="48px"
+                                                className="object-cover"
+                                            />
                                         ) : (
                                             <History className="w-5 h-5 text-muted-foreground" />
                                         )}
@@ -281,7 +287,13 @@ export function ChatInterface() {
                                 <span className="text-xs font-bold text-center uppercase text-muted-foreground">Start</span>
                                 <div className="flex-1 bg-black/5 rounded-xl overflow-hidden relative">
                                     {injury.logs[0]?.imageUrl ? (
-                                        <img src={injury.logs[0].imageUrl} className="w-full h-full object-cover" />
+                                        <Image
+                                            src={injury.logs[0].imageUrl}
+                                            alt="Start injury photo"
+                                            fill
+                                            sizes="50vw"
+                                            className="object-cover"
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">No Photo</div>
                                     )}
@@ -296,7 +308,13 @@ export function ChatInterface() {
                                 <span className="text-xs font-bold text-center uppercase text-primary">Latest</span>
                                 <div className="flex-1 bg-black/5 rounded-xl overflow-hidden relative border-2 border-primary">
                                     {injury.logs[injury.logs.length - 1]?.imageUrl ? (
-                                        <img src={injury.logs[injury.logs.length - 1].imageUrl} className="w-full h-full object-cover" />
+                                        <Image
+                                            src={injury.logs[injury.logs.length - 1].imageUrl as string}
+                                            alt="Latest injury photo"
+                                            fill
+                                            sizes="50vw"
+                                            className="object-cover"
+                                        />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">No Photo</div>
                                     )}

@@ -1,17 +1,20 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Lock, Unlock, Eye, EyeOff, Activity } from "lucide-react";
+import React, { useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { Lock, Unlock, EyeOff, Pencil, ArrowLeftRight } from "lucide-react";
 import { useInjury } from "@/context/injury-context";
-import { Card, CardContent } from "@/components/ui/card";
+import { PhotoAnnotator } from "@/components/gallery/photo-annotator";
 
 export function IncognitoGallery() {
     const { injuries } = useInjury();
     const [isLocked, setIsLocked] = useState(true);
     const [pin, setPin] = useState("");
     const [error, setError] = useState("");
+    const [annotatingPhoto, setAnnotatingPhoto] = useState<string | null>(null);
 
-    // In a real app, this would be a secure hash stored in a safe storage
+    // Demo-only PIN gate for local privacy.
     const MOCK_PIN = "1234";
 
     const handleUnlock = (e: React.FormEvent) => {
@@ -93,10 +96,33 @@ export function IncognitoGallery() {
             <div className="grid grid-cols-2 gap-4">
                 {allPhotos.map((photo) => (
                     <div key={photo.id} className="relative group rounded-xl overflow-hidden aspect-square border">
-                        <img src={photo.imageUrl} alt="Injury" className="w-full h-full object-cover" />
+                        <Image
+                            src={photo.imageUrl as string}
+                            alt={`${photo.injuryBodyPart} photo`}
+                            fill
+                            sizes="50vw"
+                            className="object-cover"
+                        />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-100 flex flex-col justify-end p-3">
                             <span className="text-white text-xs font-bold">{photo.injuryBodyPart}</span>
                             <span className="text-white/70 text-[10px]">{new Date(photo.date).toLocaleDateString()}</span>
+                        </div>
+                        {/* Action buttons */}
+                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                onClick={() => setAnnotatingPhoto(photo.imageUrl as string)}
+                                className="w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                                title="Annotate"
+                            >
+                                <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <Link
+                                href="/compare"
+                                className="w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                                title="Compare"
+                            >
+                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                            </Link>
                         </div>
                     </div>
                 ))}
@@ -107,6 +133,13 @@ export function IncognitoGallery() {
                     <EyeOff className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     <p>No photos logged yet.</p>
                 </div>
+            )}
+
+            {annotatingPhoto && (
+                <PhotoAnnotator
+                    imageUrl={annotatingPhoto}
+                    onClose={() => setAnnotatingPhoto(null)}
+                />
             )}
         </div>
     );

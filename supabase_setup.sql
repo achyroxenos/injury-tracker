@@ -4,6 +4,7 @@ create extension if not exists "uuid-ossp";
 -- 1. Create injuries table
 create table public.injuries (
   id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users(id) not null,
   type text not null check (type in ('injury', 'illness')),
   body_part text not null,
   cause text,
@@ -27,10 +28,32 @@ create table public.logs (
   activity_level text check (activity_level in ('low', 'medium', 'high'))
 );
 
--- 3. Row Level Security (RLS) - Optional for prototype (disabled for now to avoid auth complexity)
+-- 3. Row Level Security (RLS) - Secure Mode
 alter table public.injuries enable row level security;
 alter table public.logs enable row level security;
 
--- Allow public access for prototype (WARNING: Not for prod)
-create policy "Public Access Injuries" on public.injuries for all using (true);
-create policy "Public Access Logs" on public.logs for all using (true);
+-- Strict access: Users can only see, insert, update, or delete their own injuries
+create policy "Users can manage their own injuries" 
+  on public.injuries 
+  for all 
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Logs access: Users can only manage logs tied to an injury they own
+create policy "Users can manage logs for their injuries"
+  on public.logs
+  for all
+  using (
+    exists (
+      select 1 from public.injuries
+      where public.injuries.id = public.logs.injury_id
+      and public.injuries.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.injuries
+      where public.injuries.id = public.logs.injury_id
+      and public.injuries.user_id = auth.uid()
+    )
+  );

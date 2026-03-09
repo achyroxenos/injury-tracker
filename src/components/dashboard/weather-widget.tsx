@@ -1,21 +1,29 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Cloud, Sun, Droplets, Wind } from "lucide-react";
+import { Cloud, Droplets, Wind } from "lucide-react";
+
+type WeatherData = {
+    temperature_2m: number;
+    relative_humidity_2m: number;
+    surface_pressure: number;
+};
 
 export function WeatherWidget() {
-    const [weather, setWeather] = useState<any>(null);
+    const [weather, setWeather] = useState<WeatherData | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Mock location for prototype (New York) to avoid permission prompts blocking the demo
+        // Use a static location to keep the widget deterministic and permission-free.
         const lat = 40.7128;
         const lon = -74.0060;
 
         fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure&temperature_unit=celsius`)
             .then(res => res.json())
-            .then(data => {
-                setWeather(data.current);
+            .then((data: { current?: WeatherData }) => {
+                if (data.current) {
+                    setWeather(data.current);
+                }
                 setLoading(false);
             })
             .catch(err => {

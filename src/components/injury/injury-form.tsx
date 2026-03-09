@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import { Camera, Save } from "lucide-react";
 import { useInjury } from "@/context/injury-context";
 import { BodyMap3D } from "./body-map-3d";
@@ -11,6 +12,27 @@ import { Treatment } from "@/context/injury-context";
 import { RangeOfMotion } from "../tools/rom-tester";
 import { WoundAreaCalculator } from "../tools/wound-calculator";
 import { UploadButton } from "@/lib/uploadthing";
+import { AngleGuideOverlay } from "@/components/gallery/angle-guide-overlay";
+
+type SpeechRecognitionEventLike = {
+    results: {
+        0: {
+            0: { transcript: string };
+        };
+    };
+};
+
+type BrowserSpeechRecognition = {
+    onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+    start: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => BrowserSpeechRecognition;
+
+type WindowWithSpeechRecognition = Window & {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+};
 
 export function InjuryForm() {
     const router = useRouter();
@@ -35,7 +57,10 @@ export function InjuryForm() {
         activityLevel: "low" as "low" | "medium" | "high",
     });
 
-    const [newTreatment, setNewTreatment] = useState({ name: "", type: "medication" as const });
+    const [newTreatment, setNewTreatment] = useState<{ name: string; type: Treatment["type"] }>({
+        name: "",
+        type: "medication",
+    });
     const [showROM, setShowROM] = useState(false);
     const [showArea, setShowArea] = useState(false);
 
@@ -60,18 +85,6 @@ export function InjuryForm() {
                 ? prev.symptoms.filter(s => s !== sym)
                 : [...prev.symptoms, sym]
         }));
-    };
-
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result as string);
-                setStep(2);
-            };
-            reader.readAsDataURL(file);
-        }
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -160,16 +173,26 @@ export function InjuryForm() {
                             {/* Ghost Overlay */}
                             {injuryId && existingInjury?.logs.length ? (
                                 <div className="absolute inset-0 z-0 opacity-30 pointer-events-none grayscale">
-                                    <img
-                                        src={existingInjury.logs[existingInjury.logs.length - 1].imageUrl}
-                                        className="w-full h-full object-cover"
-                                        alt="Ghost overlay"
-                                    />
+                                    {existingInjury.logs[existingInjury.logs.length - 1].imageUrl ? (
+                                        <Image
+                                            src={existingInjury.logs[existingInjury.logs.length - 1].imageUrl as string}
+                                            alt="Ghost overlay"
+                                            fill
+                                            sizes="100vw"
+                                            className="object-cover"
+                                        />
+                                    ) : null}
                                     <div className="absolute inset-0 flex items-center justify-center">
                                         <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 bg-card relative overflow-hidden">
                                             {imagePreview ? (
                                                 <>
-                                                    <img src={imagePreview} className="max-h-[300px] rounded-lg shadow-sm mb-4" />
+                                                    <Image
+                                                        src={imagePreview}
+                                                        alt="Current upload preview"
+                                                        width={300}
+                                                        height={300}
+                                                        className="max-h-[300px] w-auto rounded-lg shadow-sm mb-4"
+                                                    />
                                                     <button
                                                         type="button"
                                                         onClick={() => setImagePreview(null)}
@@ -221,6 +244,15 @@ export function InjuryForm() {
                         >
                             Skip photo
                         </button>
+
+                        {/* Angle Guide for existing injuries */}
+                        {injuryId && existingInjury && existingInjury.logs.length > 0 && (
+                            <div className="mt-4">
+                                <AngleGuideOverlay
+                                    referenceImageUrl={existingInjury.logs[existingInjury.logs.length - 1].imageUrl}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -229,8 +261,8 @@ export function InjuryForm() {
                     <div className="space-y-4">
                         <h2 className="text-2xl font-bold text-center">Where does it hurt?</h2>
                         {imagePreview && (
-                            <div className="w-24 h-24 mx-auto rounded-xl overflow-hidden border-2 border-white shadow-lg mb-4">
-                                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                            <div className="relative w-24 h-24 mx-auto rounded-xl overflow-hidden border-2 border-white shadow-lg mb-4">
+                                <Image src={imagePreview} alt="Preview" fill sizes="96px" className="object-cover" />
                             </div>
                         )}
 
@@ -413,12 +445,14 @@ export function InjuryForm() {
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                                            // Simple mock for the prototype as types are tricky in nextjs without proper setup
-                                            const MockSpeech = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-                                            const recognition = new MockSpeech();
-                                            recognition.onresult = (e: any) => {
-                                                const text = e.results[0][0].transcript;
+                                        const speechWindow = window as WindowWithSpeechRecognition;
+                                        const SpeechRecognitionApi =
+                                            speechWindow.webkitSpeechRecognition ?? speechWindow.SpeechRecognition;
+
+                                        if (SpeechRecognitionApi) {
+                                            const recognition = new SpeechRecognitionApi();
+                                            recognition.onresult = (event) => {
+                                                const text = event.results[0][0].transcript;
                                                 setFormData(prev => ({ ...prev, details: prev.details + " " + text }));
                                             };
                                             recognition.start();
@@ -454,7 +488,7 @@ export function InjuryForm() {
                                 <select
                                     className="p-3 rounded-lg bg-card border text-sm"
                                     value={newTreatment.type}
-                                    onChange={e => setNewTreatment({ ...newTreatment, type: e.target.value as any })}
+                                    onChange={e => setNewTreatment({ ...newTreatment, type: e.target.value as Treatment["type"] })}
                                 >
                                     <option value="medication">Pill</option>
                                     <option value="dressing">Bandage</option>

@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import { Page, Text, View, Document, StyleSheet, Image, Font } from "@react-pdf/renderer";
-import { Injury, InjuryLog } from "@/context/injury-context";
+import { Page, Text, View, Document, StyleSheet, Image as PdfImage, Font } from "@react-pdf/renderer";
+import { Injury } from "@/context/injury-context";
 
 // Register fonts
 Font.register({
@@ -131,7 +131,7 @@ export const MedicalReport = ({ injury }: { injury: Injury }) => (
             {/* Logs */}
             <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Timeline of Updates</Text>
-                {injury.logs.map((log, i) => (
+                {injury.logs.map((log) => (
                     <View key={log.id} style={styles.logEntry}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
                             <Text style={{ fontSize: 12, fontWeight: 'bold' }}>{new Date(log.date).toLocaleString()}</Text>
@@ -141,7 +141,7 @@ export const MedicalReport = ({ injury }: { injury: Injury }) => (
                         </View>
 
                         {log.imageUrl && (
-                            <Image src={log.imageUrl} style={styles.image} />
+                            <PdfImage src={log.imageUrl} style={styles.image} />
                         )}
 
                         <Text style={styles.label}>Notes:</Text>

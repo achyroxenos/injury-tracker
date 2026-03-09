@@ -1,19 +1,25 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
-import { cn } from "@/lib/utils";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "HealTrace",
   description: "AI-Powered Injury Tracker & Healing Assistant",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "HealTrace",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#e11d48",
 };
 
 import { InjuryProvider } from "@/context/injury-context";
-import { SupplyProvider } from "@/context/supply-context"; // Added SupplyProvider import
+import { SupplyProvider } from "@/context/supply-context";
 
 export default function RootLayout({
   children,
@@ -21,10 +27,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={cn(inter.variable, "font-sans antialiased bg-secondary/30 min-h-screen pb-24")}>
+    <html lang="en" suppressHydrationWarning>
+      <body className="font-sans antialiased bg-secondary/30 min-h-screen pb-24">
         <InjuryProvider>
-          <SupplyProvider> {/* Wrapped content in SupplyProvider */}
+          <SupplyProvider>
             <Header />
             <main className="max-w-md mx-auto px-4 py-6 min-h-[calc(100vh-8rem)]">
               {children}

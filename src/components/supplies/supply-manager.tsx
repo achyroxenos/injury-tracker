@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Minus, AlertTriangle, Trash2 } from "lucide-react";
+import { Plus, Minus, AlertTriangle } from "lucide-react";
 import { useSupply } from "@/context/supply-context";
 import { cn } from "@/lib/utils";
 
 export function SupplyManager() {
-    const { supplies, updateQuantity, deleteSupply, addSupply } = useSupply();
+    const { supplies, updateQuantity, addSupply } = useSupply();
     const [isAdding, setIsAdding] = useState(false);
     const [newItem, setNewItem] = useState({ name: "", quantity: 1, unit: "pcs", lowThreshold: 3 });
 
