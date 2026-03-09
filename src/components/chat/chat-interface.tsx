@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { ExportReportButton } from "@/components/report/export-button";
 import { analyzeInjury } from "@/app/actions/analyze-injury";
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
 
 type Message = {
     id: string;
@@ -34,7 +35,18 @@ export function ChatInterface() {
     // Initialize Chat
     useEffect(() => {
         if (injury && messages.length === 0) {
-            const latestLog = injury.logs[injury.logs.length - 1];
+            const latestLog = injury.logs.at(-1);
+            if (!latestLog) {
+                setMessages([
+                    {
+                        id: "system-1",
+                        role: "assistant",
+                        content: "I need at least one log entry before I can analyze this injury. Add a new update and come back.",
+                    },
+                ]);
+                return;
+            }
+
             const isIllness = injury.type === "illness";
 
             const intro = isIllness
@@ -81,8 +93,14 @@ export function ChatInterface() {
         setIsLoading(true);
 
         try {
+            let accessToken: string | undefined = undefined;
+            if (isSupabaseConfigured) {
+                const { data: { session } } = await supabase.auth.getSession();
+                accessToken = session?.access_token;
+            }
+
             // Analyze against the selected injury context.
-            const result = await analyzeInjury(injury, userMsg.content);
+            const result = await analyzeInjury(injury, userMsg.content, accessToken);
 
             setMessages((prev) => [
                 ...prev,
@@ -107,6 +125,9 @@ export function ChatInterface() {
     };
 
     if (!injury) return <div className="p-8 text-center">Injury not found</div>;
+    if (injury.logs.length === 0) {
+        return <div className="p-8 text-center">No logs available for this injury yet.</div>;
+    }
 
     return (
         <div className="flex flex-col h-[calc(100vh-8rem)]">

@@ -1,16 +1,8 @@
 "use client";
 
 import React from "react";
-import { Page, Text, View, Document, StyleSheet, Image as PdfImage, Font } from "@react-pdf/renderer";
+import { Page, Text, View, Document, StyleSheet, Image as PdfImage } from "@react-pdf/renderer";
 import { Injury } from "@/context/injury-context";
-
-// Register fonts
-Font.register({
-    family: 'Helvetica',
-    fonts: [
-        { src: 'https://fonts.gstatic.com/s/helveticaneue/v1/1.ttf' }, // Fallback to standard font if needed
-    ]
-});
 
 const styles = StyleSheet.create({
     page: {
@@ -140,7 +132,7 @@ export const MedicalReport = ({ injury }: { injury: Injury }) => (
                             </Text>
                         </View>
 
-                        {log.imageUrl && (
+                        {log.imageUrl && !log.imageUrl.startsWith("data:") && (
                             <PdfImage src={log.imageUrl} style={styles.image} />
                         )}
 

@@ -1,11 +1,17 @@
 "use server";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Injury } from "@/context/injury-context";
+import { createClient } from "@supabase/supabase-js";
+import type { Injury } from "@/context/injury-context";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
-export async function analyzeInjury(injury: Injury, userMessage: string) {
+const unauthorizedResponse = {
+    text: "Unauthorized request. Please sign in and try again.",
+    isMock: true,
+};
+
+export async function analyzeInjury(injury: Injury, userMessage: string, accessToken?: string) {
     if (!process.env.GEMINI_API_KEY) {
         return {
             text: "I'm in demo mode because no API Key was found. Please add GEMINI_API_KEY to .env.local to unlock real AI analysis.",
@@ -14,10 +20,55 @@ export async function analyzeInjury(injury: Injury, userMessage: string) {
     }
 
     try {
+        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+        if (supabaseUrl && supabaseAnonKey) {
+            if (!accessToken) {
+                return unauthorizedResponse;
+            }
+
+            const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+                auth: {
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false,
+                },
+                global: {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                },
+            });
+
+            const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
+            if (userError || !user) {
+                return unauthorizedResponse;
+            }
+
+            const { data: ownedInjury, error: ownershipError } = await supabase
+                .from("injuries")
+                .select("id")
+                .eq("id", injury.id)
+                .eq("user_id", user.id)
+                .maybeSingle();
+
+            if (ownershipError || !ownedInjury) {
+                return unauthorizedResponse;
+            }
+        }
+
+        const latestLog = injury.logs.at(-1);
+        if (!latestLog) {
+            return {
+                text: "I need at least one log entry before I can analyze this injury. Add a log update and try again.",
+                isMock: true,
+            };
+        }
+
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
         // Construct context from injury data
-        const latestLog = injury.logs[injury.logs.length - 1];
         const context = `
       You are an empathetic, professional medical assistant AI for an Injury Tracking App.
       

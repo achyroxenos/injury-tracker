@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Session } from "@supabase/supabase-js";
 
@@ -47,11 +46,27 @@ type InjuryContextType = {
 
 const InjuryContext = createContext<InjuryContextType | undefined>(undefined);
 
+type LogFingerprint = {
+    date: string;
+    painLevel: number;
+    notes: string;
+    temperature?: number;
+    imageUrl?: string;
+};
+
+function makeLogFingerprint(log: LogFingerprint): string {
+    return [
+        log.date,
+        log.painLevel,
+        log.notes.trim(),
+        log.temperature ?? "",
+        log.imageUrl ?? "",
+    ].join("|");
+}
+
 export function InjuryProvider({ children }: { children: React.ReactNode }) {
     const [injuries, setInjuries] = useState<Injury[]>([]);
     const [session, setSession] = useState<Session | null>(null);
-    const router = useRouter();
-    const pathname = usePathname();
 
     async function syncOfflineData(userId: string) {
         const saved = localStorage.getItem("injury-data");
@@ -59,40 +74,130 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
 
         try {
             const localInjuries: Injury[] = JSON.parse(saved);
+            if (localInjuries.length === 0) {
+                localStorage.removeItem("injury-data");
+                return;
+            }
+
             console.log(`Migrating ${localInjuries.length} local records to cloud account...`);
+            const unsyncedInjuries: Injury[] = [];
 
             for (const injury of localInjuries) {
-                const { data: existing } = await supabase.from('injuries').select('id').eq('id', injury.id).single();
-                if (existing) continue;
+                let remoteInjuryId: string | null = null;
+                let injuryFailed = false;
 
-                await supabase.from('injuries').insert({
-                    id: injury.id,
-                    user_id: userId,
-                    type: injury.type,
-                    body_part: injury.bodyPart,
-                    cause: injury.cause,
-                    status: injury.status,
-                    start_date: injury.startDate
-                });
+                const { data: existingInjury, error: existingInjuryError } = await supabase
+                    .from("injuries")
+                    .select("id")
+                    .eq("user_id", userId)
+                    .eq("type", injury.type)
+                    .eq("body_part", injury.bodyPart)
+                    .eq("cause", injury.cause)
+                    .eq("start_date", injury.startDate)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (existingInjuryError) {
+                    console.error("Failed to look up existing injury during migration:", existingInjuryError);
+                    unsyncedInjuries.push(injury);
+                    continue;
+                }
+
+                if (existingInjury) {
+                    remoteInjuryId = existingInjury.id;
+                } else {
+                    const { data: insertedInjury, error: injuryInsertError } = await supabase
+                        .from("injuries")
+                        .insert({
+                            user_id: userId,
+                            type: injury.type,
+                            body_part: injury.bodyPart,
+                            cause: injury.cause,
+                            status: injury.status,
+                            archived: injury.archived ?? false,
+                            start_date: injury.startDate,
+                        })
+                        .select("id")
+                        .single();
+
+                    if (injuryInsertError || !insertedInjury) {
+                        console.error("Failed to migrate injury:", injuryInsertError);
+                        unsyncedInjuries.push(injury);
+                        continue;
+                    }
+
+                    remoteInjuryId = insertedInjury.id;
+                }
+
+                const { data: existingLogs, error: existingLogsError } = await supabase
+                    .from("logs")
+                    .select("date, pain_level, notes, temperature, image_url")
+                    .eq("injury_id", remoteInjuryId);
+
+                if (existingLogsError) {
+                    console.error("Failed to read existing logs during migration:", existingLogsError);
+                    unsyncedInjuries.push(injury);
+                    continue;
+                }
+
+                const existingLogFingerprints = new Set(
+                    (existingLogs ?? []).map((log) =>
+                        makeLogFingerprint({
+                            date: log.date,
+                            painLevel: log.pain_level,
+                            notes: log.notes ?? "",
+                            temperature: log.temperature ?? undefined,
+                            imageUrl: log.image_url ?? undefined,
+                        })
+                    )
+                );
 
                 for (const log of injury.logs) {
-                    await supabase.from('logs').insert({
-                        id: log.id,
-                        injury_id: injury.id,
+                    const fingerprint = makeLogFingerprint({
                         date: log.date,
-                        image_url: log.imageUrl,
-                        pain_level: log.painLevel,
+                        painLevel: log.painLevel,
                         notes: log.notes,
                         temperature: log.temperature,
-                        symptoms: log.symptoms,
-                        treatments: log.treatments,
-                        activity_level: log.activityLevel
+                        imageUrl: log.imageUrl,
                     });
+
+                    if (existingLogFingerprints.has(fingerprint)) continue;
+
+                    const { error: logInsertError } = await supabase
+                        .from("logs")
+                        .insert({
+                            injury_id: remoteInjuryId,
+                            date: log.date,
+                            image_url: log.imageUrl,
+                            pain_level: log.painLevel,
+                            notes: log.notes,
+                            temperature: log.temperature,
+                            symptoms: log.symptoms,
+                            treatments: log.treatments,
+                            activity_level: log.activityLevel,
+                        });
+
+                    if (logInsertError) {
+                        console.error("Failed to migrate log:", logInsertError);
+                        injuryFailed = true;
+                        continue;
+                    }
+
+                    existingLogFingerprints.add(fingerprint);
+                }
+
+                if (injuryFailed) {
+                    unsyncedInjuries.push(injury);
                 }
             }
 
-            localStorage.removeItem("injury-data");
-            console.log("Migration complete!");
+            if (unsyncedInjuries.length === 0) {
+                localStorage.removeItem("injury-data");
+                console.log("Migration complete!");
+            } else {
+                localStorage.setItem("injury-data", JSON.stringify(unsyncedInjuries));
+                console.warn(`Migration partially failed. ${unsyncedInjuries.length} records kept locally for retry.`);
+            }
         } catch (e) {
             console.error("Failed to migrate local injury data", e);
         }
@@ -107,7 +212,10 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                     setInjuries(JSON.parse(saved));
                 } catch (e) {
                     console.error("Failed to parse injury data", e);
+                    setInjuries([]);
                 }
+            } else {
+                setInjuries([]);
             }
             return;
         }
@@ -198,11 +306,16 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
+        if (!session?.user?.id) {
+            console.error("Cannot save injury without an authenticated session.");
+            return;
+        }
+
         // Insert Injury to Supabase
         const { data: newInjury, error: injError } = await supabase
             .from('injuries')
             .insert({
-                user_id: session?.user?.id,
+                user_id: session.user.id,
                 type: data.type,
                 body_part: data.bodyPart,
                 cause: data.cause,
@@ -237,7 +350,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        fetchInjuries(session?.user?.id); // Refresh local state
+        fetchInjuries(session.user.id); // Refresh local state
     };
 
     const addLogToInjury = async (injuryId: string, logData: Omit<InjuryLog, "id" | "date" | "injuryId">) => {
@@ -255,6 +368,11 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
                     inj.id === injuryId ? { ...inj, logs: [...inj.logs, newLog] } : inj
                 )
             );
+            return;
+        }
+
+        if (!session?.user?.id) {
+            console.error("Cannot add log without an authenticated session.");
             return;
         }
 
@@ -278,7 +396,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        fetchInjuries(session?.user?.id); // Refresh
+        fetchInjuries(session.user.id); // Refresh
     };
 
     useEffect(() => {
@@ -289,34 +407,34 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+        supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
             setSession(initialSession);
-            if (!initialSession && pathname !== '/login') {
-                router.push('/login');
-            } else if (initialSession) {
-                syncOfflineData(initialSession.user.id);
+            if (initialSession) {
+                await syncOfflineData(initialSession.user.id);
+                await fetchInjuries(initialSession.user.id);
+                return;
             }
-            fetchInjuries(initialSession?.user?.id);
+            await fetchInjuries();
         });
 
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, currentSession) => {
             setSession(currentSession);
-            if (!currentSession && pathname !== '/login') {
-                router.push('/login');
-            } else if (currentSession) {
-                syncOfflineData(currentSession.user.id);
+            if (currentSession) {
+                await syncOfflineData(currentSession.user.id);
+                await fetchInjuries(currentSession.user.id);
+                return;
             }
-            fetchInjuries(currentSession?.user?.id);
+            await fetchInjuries();
         });
 
         return () => subscription.unsubscribe();
-    }, [pathname, router]);
+    }, []);
 
     useEffect(() => {
-        if ((!isSupabaseConfigured || !session) && injuries.length > 0) {
+        if (!isSupabaseConfigured && injuries.length > 0) {
             localStorage.setItem("injury-data", JSON.stringify(injuries));
         }
-    }, [injuries, session]);
+    }, [injuries]);
 
     const getInjury = (id: string) => injuries.find((i) => i.id === id);
 

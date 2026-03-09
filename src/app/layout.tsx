@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Header } from "@/components/layout/header";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { AuthGuard } from "@/components/auth/auth-guard";
 
 export const metadata: Metadata = {
   title: "HealTrace",
@@ -29,15 +30,17 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased bg-secondary/30 min-h-screen pb-24">
-        <InjuryProvider>
-          <SupplyProvider>
-            <Header />
-            <main className="max-w-md mx-auto px-4 py-6 min-h-[calc(100vh-8rem)]">
-              {children}
-            </main>
-            <BottomNav />
-          </SupplyProvider>
-        </InjuryProvider>
+        <AuthGuard>
+          <InjuryProvider>
+            <SupplyProvider>
+              <Header />
+              <main className="max-w-md mx-auto px-4 py-6 min-h-[calc(100vh-8rem)]">
+                {children}
+              </main>
+              <BottomNav />
+            </SupplyProvider>
+          </InjuryProvider>
+        </AuthGuard>
       </body>
     </html>
   );
