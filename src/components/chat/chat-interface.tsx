@@ -144,36 +144,58 @@ export function ChatInterface() {
                 <>
                     <div className="flex-1 overflow-y-auto space-y-4 p-4" ref={scrollRef}>
                         {messages.map((m) => (
-                            <div key={m.id} className={cn("flex w-full", m.role === "user" ? "justify-end" : "justify-start")}>
-                                <div className={cn("max-w-[80%] rounded-2xl p-4 text-sm", m.role === "user" ? "bg-primary text-primary-foreground rounded-br-none" : "bg-card border shadow-sm rounded-bl-none")}>
-                                    {m.content}
+                            <div key={m.id} className={cn("flex w-full animate-in-up", m.role === "user" ? "justify-end" : "justify-start")}>
+                                <div className={cn(
+                                    "max-w-[85%] rounded-3xl p-4 text-sm leading-relaxed shadow-sm transition-all",
+                                    m.role === "user"
+                                        ? "bg-gradient-to-br from-primary to-rose-500 text-primary-foreground rounded-br-sm ml-4"
+                                        : "glass dark:glass-dark rounded-bl-sm mr-4 border-primary/10"
+                                )}>
+                                    {m.content.split('\n').map((line, i) => (
+                                        <p key={i} className={cn("mb-2 last:mb-0", line.startsWith('-') ? "pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-primary" : "")}>
+                                            {/* Basic markdown bold parser for UI rendering */}
+                                            {line.split(/(\*\*.*?\*\*)/).map((part, j) =>
+                                                part.startsWith('**') && part.endsWith('**')
+                                                    ? <strong key={j} className={m.role === "user" ? "font-black" : "font-bold text-primary"}>{part.slice(2, -2)}</strong>
+                                                    : part
+                                            )}
+                                        </p>
+                                    ))}
                                 </div>
                             </div>
                         ))}
 
                         {isLoading && (
-                            <div className="flex justify-start">
-                                <div className="bg-secondary text-secondary-foreground rounded-2xl rounded-tl-none py-3 px-4 max-w-[80%] shadow-sm flex items-center gap-1">
-                                    <span className="w-2 h-2 bg-current rounded-full animate-bounce" />
-                                    <span className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:0.2s]" />
-                                    <span className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:0.4s]" />
+                            <div className="flex w-full justify-start animate-fade-in pl-1">
+                                <div className="glass dark:glass-dark rounded-3xl rounded-bl-sm p-4 max-w-[85%] shadow-sm flex items-center gap-1.5 border-primary/10">
+                                    <div className="flex gap-1 items-center h-5">
+                                        <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" />
+                                        <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce [animation-delay:0.15s]" />
+                                        <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce [animation-delay:0.3s]" />
+                                    </div>
+                                    <span className="text-xs font-semibold text-muted-foreground ml-2 tracking-wide uppercase">Analyzing</span>
                                 </div>
                             </div>
                         )}
-                        <div ref={messagesEndRef} />
+                        <div ref={messagesEndRef} className="h-4" />
                     </div>
 
                     {/* Input Area */}
-                    <div className="p-4 border-t bg-background/50">
-                        <form onSubmit={handleSend} className="flex gap-2">
+                    <div className="p-4 bg-background/80 glass dark:glass-dark border-t shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                        <form onSubmit={handleSend} className="flex gap-3 max-w-md mx-auto relative">
                             <input
                                 value={input}
                                 onChange={(e) => setInput(e.target.value)}
-                                placeholder="Ask..."
-                                className="flex-1 bg-secondary rounded-full px-4 py-3 text-sm outline-none"
+                                placeholder="Message your assistant..."
+                                className="flex-1 bg-secondary/80 focus:bg-background rounded-full pl-6 pr-14 py-4 text-sm outline-none border border-transparent focus:border-primary/30 focus:shadow-sm transition-all shadow-inner"
+                                disabled={isLoading}
                             />
-                            <button type="submit" className="w-12 h-12 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
-                                <Send className="w-5 h-5" />
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || isLoading}
+                                className="absolute right-2 top-2 bottom-2 aspect-square bg-primary text-primary-foreground rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 shadow-sm"
+                            >
+                                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
                             </button>
                         </form>
                     </div>

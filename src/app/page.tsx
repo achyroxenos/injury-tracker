@@ -21,40 +21,22 @@ export default function Home() {
 
   return (
     <div className="space-y-6 animate-in-up pb-[100px]">
-      <header className="flex justify-between items-center mb-6">
+      <header className="flex justify-between items-center mb-6 animate-fade-in">
         <div>
-          <h1 className="text-2xl font-black tracking-tight">Recovery<span className="text-primary">.ai</span></h1>
-          <p className="text-sm text-muted-foreground">Welcome back, Daniel</p>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">Heal<span className="text-primary">Trace</span></h1>
+          <p className="text-sm font-medium text-muted-foreground mt-1">Welcome back, Daniel</p>
         </div>
-        <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full">
+        <div className="flex items-center gap-2 bg-gradient-to-r from-primary/20 to-primary/5 px-4 py-2 rounded-full border border-primary/10 shadow-sm">
           <TrendingUp className="w-4 h-4 text-primary" />
-          <span className="text-sm font-bold">{streak} Day Streak</span>
+          <span className="text-sm font-bold text-primary-foreground/90 dark:text-primary-foreground">{streak} Day Streak</span>
         </div>
       </header>
 
       {/* Notification Manager */}
       <NotificationManager />
 
-      <WeatherWidget />
-
-      {/* Quick Stats Grid */}
-      <div className="grid grid-cols-2 gap-3">
-        {/* The original Plus button Link was here, but the instruction implies it's part of a new grid item or removed.
-            For now, I'll assume the instruction's snippet for the Link is a placeholder for a grid item.
-            Given the instruction, the previous header content is replaced.
-            I will re-add the Plus button as a separate element if it's not part of the new grid.
-            Based on the instruction, the `Link` with `Plus` button is now inside this grid.
-            However, the instruction snippet is incomplete for the `Link` tag.
-            I will assume the `Link` is intended to be one of the grid items.
-            Since the instruction only shows a fragment of the Link, and then the `</div>` for the grid,
-            I will place the original Link inside this grid for now, assuming it's meant to be a grid item.
-            If it's not, further clarification would be needed.
-            For now, I'll put the original Link as the first item in this new grid.
-        */}
-        <Link href="/log" className="bg-primary text-primary-foreground p-2 rounded-full shadow-lg flex items-center justify-center">
-          <Plus className="w-6 h-6" />
-        </Link>
-        {/* Other grid items would go here */}
+      <div className="animate-scale-in animation-delay-100">
+        <WeatherWidget />
       </div>
 
 
@@ -72,20 +54,23 @@ export default function Home() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          <h2 className="font-semibold text-lg">Your Recoveries</h2>
+        <div className="grid gap-4 animate-in-up animation-delay-200">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="font-bold text-xl tracking-tight">Your Recoveries</h2>
+            <Link href="/gallery" className="text-xs font-semibold text-primary hover:underline">View All</Link>
+          </div>
           {activeInjuries.map((injury) => {
             const latestLog = getLatestLog(injury.id);
             return (
               <Link key={injury.id} href={`/chat?context=${injury.id}`}>
-                <Card className="overflow-hidden hover:border-primary/50 transition-colors group">
+                <Card className="overflow-hidden border-border/50 hover:border-primary/40 hover:shadow-md transition-all duration-300 group hover:-translate-y-1 bg-card/80 backdrop-blur-sm">
                   <div className="flex">
-                    <div className="w-24 bg-secondary flex-shrink-0 relative">
+                    <div className="w-28 bg-secondary/50 flex-shrink-0 relative overflow-hidden">
                       {latestLog?.imageUrl ? (
-                        <img src={latestLog.imageUrl} alt={injury.bodyPart} className="w-full h-full object-cover" />
+                        <img src={latestLog.imageUrl} alt={injury.bodyPart} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-secondary">
-                          <Activity className="text-muted-foreground" />
+                        <div className="w-full h-full flex items-center justify-center bg-secondary/80 group-hover:bg-secondary transition-colors">
+                          <Activity className="text-muted-foreground/50 w-8 h-8" />
                         </div>
                       )}
 
@@ -127,24 +112,24 @@ export default function Home() {
       )}
 
       {/* Quick Actions / Insights */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="bg-gradient-to-br from-indigo-500 to-purple-600 border-none text-white">
-          <CardContent className="p-4 flex flex-col justify-between h-32">
-            <Activity className="w-6 h-6 opacity-80" />
+      <div className="grid grid-cols-2 gap-4 mt-8 animate-in-up animation-delay-300">
+        <Card className="bg-gradient-to-br from-indigo-500 via-purple-500 to-primary/80 border-none text-white shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-shadow">
+          <CardContent className="p-5 flex flex-col justify-between h-36">
+            <Activity className="w-7 h-7 opacity-90 drop-shadow-sm mb-2" />
             <div>
-              <p className="text-xs font-medium opacity-80 uppercase tracking-wider">Health Status</p>
-              <p className="font-bold text-lg">Good Condition</p>
+              <p className="text-[10px] font-bold opacity-80 uppercase tracking-widest mb-1">Health Status</p>
+              <p className="font-black text-lg leading-tight">Good<br />Condition</p>
             </div>
           </CardContent>
         </Card>
-        <Card className="glass border-primary/20">
-          <CardContent className="p-4 flex flex-col justify-between h-32">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-primary font-bold">AI</span>
+        <Card className="glass dark:glass-dark border-primary/20 hover:border-primary/40 transition-colors shadow-sm">
+          <CardContent className="p-5 flex flex-col justify-between h-36">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-2 shadow-inner">
+              <span className="text-primary font-black text-sm">AI</span>
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Daily Tip</p>
-              <p className="font-medium text-sm text-foreground line-clamp-2">"Keep your wounds clean and covered for faster healing."</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Daily Tip</p>
+              <p className="font-medium text-xs text-foreground line-clamp-3 leading-relaxed">"Keep your wounds clean and covered for faster healing."</p>
             </div>
           </CardContent>
         </Card>

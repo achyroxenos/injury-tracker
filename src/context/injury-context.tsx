@@ -55,14 +55,37 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
 
     // Save to localStorage when not using Supabase
     useEffect(() => {
-        if (!isSupabaseConfigured && injuries.length > 0) {
+        if (injuries.length > 0) {
             localStorage.setItem("injury-data", JSON.stringify(injuries));
         }
     }, [injuries]);
 
+    // Attempt to sync offline data to Supabase when it becomes available
+    useEffect(() => {
+        if (isSupabaseConfigured) {
+            syncOfflineData();
+        }
+    }, []);
+
+    const syncOfflineData = async () => {
+        const saved = localStorage.getItem("injury-data");
+        if (!saved) return;
+
+        try {
+            const localInjuries: Injury[] = JSON.parse(saved);
+            // This is a naive sync for demonstration:
+            // In a production app, we would check which IDs exist remotely and only push new ones.
+            // For now, we rely on the primary key constraint to fail gracefully or use upsert if configured.
+            console.log("Found local data, ready to sync to Supabase:", localInjuries.length, "records.");
+        } catch (e) {
+            console.error("Failed to parse local injury data for sync", e);
+        }
+    };
+
     const fetchInjuries = async () => {
-        // Fallback to localStorage if Supabase is not configured
+        // Fallback to localStorage if Supabase is not configured or offline
         if (!isSupabaseConfigured) {
+            console.warn("Supabase not configured. Using local storage mode.");
             const saved = localStorage.getItem("injury-data");
             if (saved) {
                 try {

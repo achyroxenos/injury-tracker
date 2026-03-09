@@ -35,10 +35,11 @@ export async function analyzeInjury(injury: Injury, userMessage: string) {
       User Question: "${userMessage}"
       
       Instructions:
-      1. Answer the user's question directly based on the medical context provided.
-      2. Be concise (max 3-4 sentences).
-      3. If the user asks for a diagnosis, gently remind them you are an AI and they should see a doctor.
-      4. Use encouraging tone.
+      1. Answer the user's query directly based on the medical context above.
+      2. Speak with an empathetic, conversational, yet highly professional tone.
+      3. Use clear **Markdown formatting** (bullet points, bold text for emphasis) to make your response extremely easy to read.
+      4. Be concise (maximum 3-4 sentences total).
+      5. If the user asks for a diagnosis or treatment plan, kindly remind them you are an AI assistant and they should consult a real healthcare professional.
     `;
 
         const result = await model.generateContent(context);

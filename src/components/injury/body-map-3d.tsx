@@ -75,19 +75,36 @@ function BodyModel({ onSelectPart, selectedPart }: { onSelectPart: (part: string
 
 function BodyPart({ position, args, color, name, onClick, geometry = "sphere" }: any) {
     const [hovered, setHover] = useState(false);
+    const meshRef = useRef<THREE.Mesh>(null);
+
+    useFrame((state) => {
+        if (meshRef.current && hovered) {
+            meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, position[1] + 0.05, 0.1);
+        } else if (meshRef.current) {
+            meshRef.current.position.y = THREE.MathUtils.lerp(meshRef.current.position.y, position[1], 0.1);
+        }
+    });
 
     return (
         <mesh
+            ref={meshRef}
             position={position}
             onClick={(e) => { e.stopPropagation(); onClick(); }}
-            onPointerOver={() => setHover(true)}
-            onPointerOut={() => setHover(false)}
+            onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer'; }}
+            onPointerOut={() => { setHover(false); document.body.style.cursor = 'default'; }}
+            castShadow
+            receiveShadow
         >
             {geometry === "sphere" ? <sphereGeometry args={args} /> : <boxGeometry args={args} />}
-            <meshStandardMaterial color={hovered ? "#fda4af" : color} />
+            <meshStandardMaterial
+                color={hovered ? "#fb7185" : color}
+                roughness={0.4}
+                metalness={0.1}
+                envMapIntensity={1}
+            />
             {hovered && (
-                <Html distanceFactor={10}>
-                    <div className="bg-black/80 text-white text-xs px-2 py-1 rounded pointer-events-none whitespace-nowrap">
+                <Html distanceFactor={10} zIndexRange={[100, 0]}>
+                    <div className="bg-foreground/90 text-background text-xs font-semibold px-2.5 py-1.5 rounded-md pointer-events-none whitespace-nowrap shadow-xl backdrop-blur-sm animate-in-up">
                         {name}
                     </div>
                 </Html>
@@ -98,15 +115,24 @@ function BodyPart({ position, args, color, name, onClick, geometry = "sphere" }:
 
 export function BodyMap3D({ onPartSelect, selectedPart }: { onPartSelect: (part: string) => void, selectedPart?: string }) {
     return (
-        <div className="w-full h-[300px] bg-secondary/10 rounded-xl overflow-hidden border">
-            <Canvas camera={{ position: [0, 0, 4], fov: 50 }}>
-                <ambientLight intensity={0.5} />
-                <pointLight position={[10, 10, 10]} />
+        <div className="w-full h-[350px] bg-gradient-to-b from-secondary/50 to-background rounded-2xl overflow-hidden border shadow-inner relative">
+            <Canvas camera={{ position: [0, 0, 4.5], fov: 45 }} shadows>
+                <ambientLight intensity={0.4} />
+                <directionalLight
+                    position={[5, 5, 5]}
+                    intensity={1.5}
+                    castShadow
+                    shadow-mapSize-width={1024}
+                    shadow-mapSize-height={1024}
+                />
+                <pointLight position={[-10, -10, -10]} intensity={0.5} color="#be123c" />
                 <BodyModel onSelectPart={onPartSelect} selectedPart={selectedPart} />
-                <OrbitControls enableZoom={false} />
+                <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 4} maxPolarAngle={Math.PI / 1.5} />
             </Canvas>
-            <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground pointer-events-none bg-white/50 px-2 rounded">
-                Drag to rotate • Tap to select
+            <div className="absolute bottom-3 left-0 right-0 text-center pointer-events-none">
+                <span className="bg-background/80 backdrop-blur-sm text-[10px] font-medium text-muted-foreground px-3 py-1.5 rounded-full shadow-sm border">
+                    Drag to rotate • Tap to select
+                </span>
             </div>
         </div>
     );
