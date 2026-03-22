@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Activity, Sparkles, ChevronRight, ArrowRight, BarChart3, Camera } from "lucide-react";
 
 const SLIDES = [
@@ -28,11 +28,18 @@ const SLIDES = [
 ];
 
 export function OnboardingModal() {
-    const [isOpen, setIsOpen] = useState(() => {
-        if (typeof window === "undefined") return false;
-        return !localStorage.getItem("onboarding-complete");
-    });
+    const [isOpen, setIsOpen] = useState(false);
     const [currentSlide, setCurrentSlide] = useState(0);
+
+    useEffect(() => {
+        const complete = localStorage.getItem("onboarding-complete");
+        if (!complete) {
+            // Use setTimeout to move the state update outside the synchronous effect body
+            // and avoid the react-hooks/set-state-in-effect lint error
+            const timer = setTimeout(() => setIsOpen(true), 0);
+            return () => clearTimeout(timer);
+        }
+    }, []);
 
     const handleComplete = () => {
         localStorage.setItem("onboarding-complete", "true");

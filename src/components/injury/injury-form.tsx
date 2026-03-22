@@ -171,10 +171,10 @@ export function InjuryForm() {
                             {injuryId ? "Align with the previous photo." : "Take a clear photo for AI analysis."}
                         </p>
 
-                        <label className="block relative aspect-[4/5] bg-secondary/30 rounded-2xl border-2 border-dashed border-secondary hover:border-primary/50 transition-colors cursor-pointer overflow-hidden flex flex-col items-center justify-center group">
-                            {/* Ghost Overlay */}
+                        <div className="relative aspect-[4/5] bg-secondary/30 rounded-2xl border-2 border-dashed border-secondary hover:border-primary/50 transition-colors overflow-hidden flex flex-col items-center justify-center group">
+                            {/* Ghost Overlay (Previous Image) */}
                             {injuryId && existingInjury?.logs.length ? (
-                                <div className="absolute inset-0 z-0 opacity-30 pointer-events-none grayscale">
+                                <div className="absolute inset-0 z-0 opacity-30 grayscale pointer-events-none">
                                     {existingInjury.logs[existingInjury.logs.length - 1].imageUrl ? (
                                         <Image
                                             src={existingInjury.logs[existingInjury.logs.length - 1].imageUrl as string}
@@ -184,60 +184,61 @@ export function InjuryForm() {
                                             className="object-cover"
                                         />
                                     ) : null}
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                        <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 bg-card relative overflow-hidden">
-                                            {imagePreview ? (
-                                                <>
-                                                    <Image
-                                                        src={imagePreview}
-                                                        alt="Current upload preview"
-                                                        width={300}
-                                                        height={300}
-                                                        className="max-h-[300px] w-auto rounded-lg shadow-sm mb-4"
-                                                    />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setImagePreview(null)}
-                                                        className="text-xs text-destructive font-bold"
-                                                    >
-                                                        Remove Photo
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <div className="text-center w-full">
-                                                    <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                                                        <Camera className="w-8 h-8 text-primary" />
-                                                    </div>
-                                                    <h3 className="font-bold mb-2">Take a Photo</h3>
-                                                    <p className="text-xs text-muted-foreground mb-4">
-                                                        Ensure good lighting for accurate AI analysis.
-                                                    </p>
-
-                                                    <div className="flex justify-center">
-                                                        <UploadButton
-                                                            endpoint="imageUploader"
-                                                            onClientUploadComplete={(res) => {
-                                                                if (res && res[0]) {
-                                                                    setImagePreview(res[0].url);
-                                                                    alert("Upload Completed");
-                                                                }
-                                                            }}
-                                                            onUploadError={(error: Error) => {
-                                                                alert(`ERROR! ${error.message}`);
-                                                            }}
-                                                            appearance={{
-                                                                button: "bg-primary text-primary-foreground font-bold px-4 py-2 rounded-lg text-sm"
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
                                 </div>
                             ) : null}
 
-                        </label>
+                            {/* Upload UI / Preview */}
+                            <div className="z-10 w-full h-full flex items-center justify-center p-4">
+                                <div className="flex flex-col items-center justify-center border-2 border-dashed border-border rounded-xl p-8 bg-card/90 backdrop-blur-sm shadow-xl max-w-[90%] w-full">
+                                    {imagePreview ? (
+                                        <>
+                                            <div className="relative w-full aspect-square mb-4">
+                                                <Image
+                                                    src={imagePreview}
+                                                    alt="Current upload preview"
+                                                    fill
+                                                    className="object-cover rounded-lg shadow-sm"
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setImagePreview(null)}
+                                                className="text-xs text-destructive font-bold hover:underline"
+                                            >
+                                                Remove Photo
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="text-center w-full">
+                                            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                <Camera className="w-8 h-8 text-primary" />
+                                            </div>
+                                            <h3 className="font-bold mb-2 text-foreground">Take a Photo</h3>
+                                            <p className="text-xs text-muted-foreground mb-6">
+                                                {injuryId ? "Align with the shadow for consistency." : "Ensure good lighting for AI analysis."}
+                                            </p>
+
+                                            <div className="flex justify-center">
+                                                <UploadButton
+                                                    endpoint="imageUploader"
+                                                    onClientUploadComplete={(res) => {
+                                                        if (res && res[0]) {
+                                                            setImagePreview(res[0].url);
+                                                        }
+                                                    }}
+                                                    onUploadError={(error: Error) => {
+                                                        alert(`ERROR! ${error.message}`);
+                                                    }}
+                                                    appearance={{
+                                                        button: "bg-primary text-primary-foreground font-bold px-6 py-2.5 rounded-xl text-sm shadow-lg hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
 
                         <button
                             type="button"

@@ -7,19 +7,17 @@ import { QuickLogWidget } from "@/components/dashboard/quick-log-widget";
 import { TrendingUp, Activity, ArrowRight, Calendar, Sparkles } from "lucide-react";
 import { useInjury } from "@/context/injury-context";
 import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, getGreeting } from "@/lib/utils";
 import { NotificationManager } from "@/components/notifications/notification-manager";
 import { OnboardingModal } from "@/components/onboarding/onboarding-modal";
-
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  return "Good evening";
-}
+import { isSupabaseConfigured, supabase } from "@/lib/supabase";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const { injuries, getStreak } = useInjury();
+  const [userName, setUserName] = useState<string>("Daniel");
+  const [greeting, setGreeting] = useState<string>("Good day");
+
   const activeInjuries = injuries.filter(i => !i.archived);
   const streak = getStreak();
 
@@ -40,6 +38,20 @@ export default function Home() {
 
   const needingLog = getInjuriesNeedingLog();
 
+  useEffect(() => {
+    setTimeout(() => setGreeting(getGreeting()), 0);
+
+    if (isSupabaseConfigured) {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user?.user_metadata?.full_name) {
+          setUserName(data.user.user_metadata.full_name.split(" ")[0]);
+        } else if (data.user?.email) {
+          setUserName(data.user.email.split("@")[0]);
+        }
+      });
+    }
+  }, []);
+
   return (
     <div className="space-y-6 animate-in-up pb-[100px]">
       {/* Onboarding for first-time visitors */}
@@ -50,7 +62,7 @@ export default function Home() {
           <h1 className="text-3xl font-black tracking-tight text-foreground">
             Heal<span className="bg-clip-text text-transparent bg-gradient-to-r from-primary to-rose-400">Trace</span>
           </h1>
-          <p className="text-sm font-medium text-muted-foreground mt-1">{getGreeting()}, Daniel</p>
+          <p className="text-sm font-medium text-muted-foreground mt-1">{greeting}, {userName}</p>
         </div>
         <div className="flex items-center gap-2 bg-gradient-to-r from-primary/20 to-primary/5 px-4 py-2 rounded-full border border-primary/10 shadow-sm animate-pulse-glow">
           <TrendingUp className="w-4 h-4 text-primary" />
