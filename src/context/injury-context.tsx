@@ -121,6 +121,7 @@ function mapDbInjury(injury: DbInjuryRow, logs: InjuryLog[]): Injury {
 export function InjuryProvider({ children }: { children: React.ReactNode }) {
     const [injuries, setInjuries] = useState<Injury[]>([]);
     const [session, setSession] = useState<Session | null>(null);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     async function syncOfflineData(userId: string) {
         const saved = localStorage.getItem("injury-data");
@@ -271,6 +272,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
             } else {
                 setInjuries([]);
             }
+            setIsInitialized(true);
             return;
         }
 
@@ -321,6 +323,7 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
         );
 
         setInjuries(mappedInjuries);
+        setIsInitialized(true);
     }
 
     const addInjury = async (
@@ -493,9 +496,9 @@ export function InjuryProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (isSupabaseConfigured) return;
+        if (isSupabaseConfigured || !isInitialized) return;
         localStorage.setItem("injury-data", JSON.stringify(injuries));
-    }, [injuries]);
+    }, [injuries, isInitialized]);
 
     const getInjury = (id: string) => injuries.find((i) => i.id === id);
 
