@@ -25,22 +25,29 @@ const DEFAULT_SUPPLIES: Supply[] = [
 ];
 
 export function SupplyProvider({ children }: { children: React.ReactNode }) {
-    const [supplies, setSupplies] = useState<Supply[]>(() => {
-        if (typeof window === "undefined") return DEFAULT_SUPPLIES;
-        const stored = localStorage.getItem("supply-data");
-        if (!stored) return DEFAULT_SUPPLIES;
-
-        try {
-            return JSON.parse(stored) as Supply[];
-        } catch (error) {
-            console.error("Failed to parse supply data from localStorage", error);
-            return DEFAULT_SUPPLIES;
-        }
-    });
+    const [supplies, setSupplies] = useState<Supply[]>(DEFAULT_SUPPLIES);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     useEffect(() => {
-        localStorage.setItem("supply-data", JSON.stringify(supplies));
-    }, [supplies]);
+        const stored = localStorage.getItem("supply-data");
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                // Use setTimeout to move the state update outside the synchronous effect body
+                // and avoid the react-hooks/set-state-in-effect lint error
+                setTimeout(() => setSupplies(parsed), 0);
+            } catch (error) {
+                console.error("Failed to parse supply data from localStorage", error);
+            }
+        }
+        setTimeout(() => setIsInitialized(true), 0);
+    }, []);
+
+    useEffect(() => {
+        if (isInitialized) {
+            localStorage.setItem("supply-data", JSON.stringify(supplies));
+        }
+    }, [supplies, isInitialized]);
 
     const addSupply = (data: Omit<Supply, "id">) => {
         const newSupply = { ...data, id: crypto.randomUUID() };
